@@ -11,6 +11,7 @@
 #include <opencv2/opencv.hpp>
 
 #include <string>
+#include <typeinfo>
 
 std::vector<cam> read_cams(std::string const &folder)
 {
@@ -35,7 +36,8 @@ std::vector<cam> read_cams(std::string const &folder)
 		const int size = width * height * 1.5; // YUV 420
 
 		std::vector<cv::Mat> YUV;
-		cv::split(im_rgb, YUV);
+		//cv::split(im_rgb, YUV); //im_yuv instead?
+		cv::split(im_yuv, YUV);
 
 		// Params
 		cam_array.at(i) = cam(name, width, height, size, YUV, cam_params_vector.at(i));
@@ -77,7 +79,7 @@ std::vector<cv::Mat> sweeping_plane(cam const ref, std::vector<cam> const &cam_v
 					// (i) calculate projection index
 
 					// Calculate z from ZNear, ZFar and ZPlanes (projective transformation) (zi = 0, z = ZFar)
-					double z = ZNear * ZFar / (ZNear + (((double)zi / (double)ZPlanes) * (ZFar - ZNear)));
+					double z = ZNear * ZFar / (ZNear + (((double)zi / (double)ZPlanes) * (ZFar - ZNear))); //need to be in the x and y loops?
 
 					// 2D ref camera point to 3D in ref camera coordinates (p * K_inv)
 					double X_ref = (ref.p.K_inv[0] * x + ref.p.K_inv[1] * y + ref.p.K_inv[2]) * z;
@@ -176,6 +178,31 @@ cv::Mat find_min(std::vector<cv::Mat> const &cost_cube)
 	return depth;
 }
 
+// Test to take YUV matrix from a cam
+void test_YUV_mat(std::vector<cv::Mat> const &YUV)
+{
+	/*cv::namedWindow("Y", cv::WindowFlags::WINDOW_AUTOSIZE);
+	cv::imshow("Y", YUV[0]);
+	cv::namedWindow("U", cv::WindowFlags::WINDOW_AUTOSIZE);
+	cv::imshow("U", YUV[1]);
+	cv::namedWindow("V", cv::WindowFlags::WINDOW_AUTOSIZE);
+	cv::imshow("V", YUV[2]);
+	cv::waitKey(0);*/
+	printf("rows %i\n", YUV[0].rows);
+	printf("columns %i\n", YUV[0].cols);
+
+	// type(element) in Y from YUV == double bad for GPU?
+	/*int i = 0;
+	cv::MatConstIterator_<double> it = YUV[0].begin<double>(), it_end = YUV[0].end<double>();
+	for (; it != it_end; it++) {
+		float r = *it;
+		std::cout << r << "\n" << std::endl;
+		std::cout << *it << "\n" << std::endl;
+		std::cout << typeid(*it).name() << std::endl;
+		break;
+	}*/
+}
+
 int main()
 {
 	// Read cams
@@ -184,16 +211,19 @@ int main()
 	// Test call a CUDA function
 	wrap_test_vectorAdd();
 
-	// Sweeping algorithm for camera 0
-	std::vector<cv::Mat> cost_cube = sweeping_plane(cam_vector.at(0), cam_vector, 5);
+	// Test to take YUV matrix from a cam
+	test_YUV_mat(cam_vector.at(0).YUV);
 
-	// Find min cost and generate depth map
-	cv::Mat depth = find_min(cost_cube);
-	cv::namedWindow("Depth", cv::WINDOW_NORMAL);
-	cv::imshow("Depth", depth);
-	cv::waitKey(0);
+	//// Sweeping algorithm for camera 0
+	//std::vector<cv::Mat> cost_cube = sweeping_plane(cam_vector.at(0), cam_vector, 5);
 
-	printf("%f", depth.at<float>(0, 0));
+	//// Find min cost and generate depth map
+	//cv::Mat depth = find_min(cost_cube);
+	//cv::namedWindow("Depth", cv::WINDOW_NORMAL);
+	//cv::imshow("Depth", depth);
+	//cv::waitKey(0);
+
+	//printf("%f", depth.at<float>(0, 0));
 
 	return 0;
 }
