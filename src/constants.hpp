@@ -1,6 +1,7 @@
 #include <vector>
 #include <string>
 #include <opencv2/core/mat.hpp>
+#include <iostream>
 
 const float ZNear = 0.3f;
 const float ZFar = 1.1f;

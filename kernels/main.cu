@@ -45,11 +45,7 @@ void wrap_test_vectorAdd() {
 	}
 }
 
-void test(cv::Mat const &Y) {
-	cv::namedWindow("Y", cv::WindowFlags::WINDOW_AUTOSIZE);
-	cv::imshow("Y", Y);
-	cv::waitKey(0);
-}
+
 
 //__global__ void compute_cost_naive(float* cost, float* cc, std::vector<cv::Mat> const &ref, std::vector<cv::Mat> const &cam, int* id_x, int* id_y, int N)
 //{
@@ -117,66 +113,102 @@ void test(cv::Mat const &Y) {
 //cost /= cc;
 
 
-//__global__ void compute_cost_naive(float* cost, float* cc, std::vector<cv::Mat> const& ref, std::vector<cv::Mat> const& cam, int* id_x, int* id_y, int N)
-//{
-//	int k = blockIdx.x * blockDim.x + threadIdx.x;
-//	int l = blockIdx.y * blockDim.y + threadIdx.y;
-//
-//	if (k >= N || l >= N) return;
-//
-//	
-//}
-//
-//void frame2frame_matching(cam &ref, cam &cam_1, std::vector<cv::Mat> &cost_cube, int zi, int half_window)
-////std::vector<cv::Mat> frame2frame_matching(std::vector<cam> const &ref, std::vector<cam> const &cam, std::vector<cv::Mat> const &cost_cube, int zi, int half_window)
-//{
-//	printf("Naive cost frame2frame_matching:\n");
-//
-//	int* dev_width, dev_height, dev_zi, dev_znear, dev_zfar, dev_zplanes, dev_half_window;
-//	std::vector<double>* dev_cam_K, dev_cam_R, dev_cam_t, dev_ref_inv_K, dev_ref_inv_R, dev_ref_inv_t;
-//	cv::Mat* dev_Y_cam, dev_Y_ref;
-//	std::vector<cv::Mat>* dev_cost_cube;
-//
-//	CHK(cudaSetDevice(0));
-//
-//	// width, height, zi, Znear, ZFar, ZPlanes, K, R, t, inv_K, inv_R, inv_t, window, Y_cam, Y_ref, cost_cube
-//
-//	CHK(cudaMalloc((void**)&dev_width, sizeof(int)));
-//	CHK(cudaMalloc((void**)&dev_height, sizeof(int)));
-//	CHK(cudaMalloc((void**)&dev_zi, sizeof(int)));
-//	CHK(cudaMalloc((void**)&dev_znear, sizeof(int)));
-//	CHK(cudaMalloc((void**)&dev_zfar, sizeof(int)));
-//	CHK(cudaMalloc((void**)&dev_zplanes, sizeof(int)));
-//	CHK(cudaMalloc((void**)&dev_half_window, sizeof(int)));
-//	CHK(cudaMalloc((void**)&dev_cam_K, 9 * sizeof(double)));
-//	CHK(cudaMalloc((void**)&dev_cam_R, 9 * sizeof(double)));
-//	CHK(cudaMalloc((void**)&dev_cam_t, 3 * sizeof(double)));
-//	CHK(cudaMalloc((void**)&dev_ref_inv_K, 9 * sizeof(double)));
-//	CHK(cudaMalloc((void**)&dev_ref_inv_R, 9 * sizeof(double)));
-//	CHK(cudaMalloc((void**)&dev_ref_inv_t, 3 * sizeof(double)));
-//	CHK(cudaMalloc((void**)&dev_Y_ref, ref.YUV[0].cols * ref.YUV[0].rows * sizeof(float)));
-//	CHK(cudaMalloc((void**)&dev_Y_cam, cam.YUV[0].cols * cam.YUV[0].rows * sizeof(float)));
-//	CHK(cudaMalloc((void**)&dev_cost_cube, ZPlanes * cam.YUV[0].cols * cam.YUV[0].rows * sizeof(float)));
-//
-//	cudaMemcpy(dev_width, ref.width, sizeof(int), cudaMemcpyHostToDevice);
-//	cudaMemcpy(dev_height, ref.height, sizeof(int), cudaMemcpyHostToDevice);
-//	cudaMemcpy(dev_zi, zi, sizeof(int), cudaMemcpyHostToDevice);
-//	cudaMemcpy(dev_znear, ZNear, sizeof(int), cudaMemcpyHostToDevice);
-//	cudaMemcpy(dev_zfar, ZFar, sizeof(int), cudaMemcpyHostToDevice);
-//	cudaMemcpy(dev_zplanes, ZPlanes, sizeof(int), cudaMemcpyHostToDevice);
-//	cudaMemcpy(dev_half_window, half_window, sizeof(int), cudaMemcpyHostToDevice);
-//	cudaMemcpy(dev_cam_K, cam.p.K, 9 * sizeof(double), cudaMemcpyHostToDevice);
-//	cudaMemcpy(dev_cam_R, cam.p.R, 9 * sizeof(double), cudaMemcpyHostToDevice);
-//	cudaMemcpy(dev_cam_t, cam.p.t, 3 * sizeof(double), cudaMemcpyHostToDevice);
-//	cudaMemcpy(dev_ref_inv_K, ref.p.inv_K, 9 * sizeof(double), cudaMemcpyHostToDevice);
-//	cudaMemcpy(dev_ref_inv_R, ref.p.inv_R, 9 * sizeof(double), cudaMemcpyHostToDevice);
-//	cudaMemcpy(dev_ref_inv_t, ref.p.inv_t, 3 * sizeof(double), cudaMemcpyHostToDevice);
-//	cudaMemcpy(dev_Y_ref, ref.YUV[0], ref.YUV[0].cols * ref.YUV[0].rows * sizeof(float), cudaMemcpyHostToDevice);
-//	cudaMemcpy(dev_Y_cam, cam.YUV[0], cam.YUV[0].cols * cam.YUV[0].rows * sizeof(float), cudaMemcpyHostToDevice);
-//	cudaMemcpy(dev_cost_cube, cost_cube, ZPlanes * cam.YUV[0].cols * cam.YUV[0].rows * sizeof(float), cudaMemcpyHostToDevice);
-//
-//	int N_threads = 1024;
-//	dim3 thread_size(N_threads);
-//	dim3 block_size(((ref.height * ref.width) + N_threads - 1) / N_threads);
-//	std::cout << "thread size " << thread_size << ", block size " << block_size << std::endl;
-//}
+__global__ void compute_cost_naive(float* cost, float* cc, std::vector<cv::Mat> const& ref, std::vector<cv::Mat> const& cam, int* id_x, int* id_y, int N)
+{
+	int k = blockIdx.x * blockDim.x + threadIdx.x;
+	int l = blockIdx.y * blockDim.y + threadIdx.y;
+
+	if (k >= N || l >= N) return;
+
+	
+}
+
+void test(cv::Mat const& Y) {
+	cv::Mat* dev_Y;
+	uchar* Y_arr = Y.isContinuous()? Y.data: Y.clone().data;
+	
+	cudaSetDevice(0);
+	cudaMalloc((void**)&dev_Y, sizeof(int));
+	cudaMemcpy(&dev_Y, Y_arr, 1920*1080*sizeof(float), cudaMemcpyHostToDevice);
+
+
+	cv::namedWindow("Y", cv::WindowFlags::WINDOW_AUTOSIZE);
+	cv::imshow("Y", Y);
+	cv::waitKey(0);
+}
+
+//std::vector<cv::Mat> frame2frame_matching(std::vector<cam> const &ref, std::vector<cam> const &cam, std::vector<cv::Mat> const &cost_cube, int zi, int half_window)
+void frame2frame_matching(cam &ref, cam &cam_1, std::vector<cv::Mat> &cost_cube, int zi, int half_window)
+{
+	printf("Naive cost frame2frame_matching:\n");
+
+	uint mat_length;
+
+	std::vector<float*> new_cost_cube;
+	for (auto& mat : cost_cube)
+	{
+		mat_length = mat.total()*mat.channels();
+		float* mat_arr = mat.isContinuous() ? (float*)mat.data : (float*)mat.clone().data;
+		new_cost_cube.push_back(mat_arr);
+	}
+
+
+	/*mat_length = cost_cube[0].total() * cost_cube[0].channels();
+	float* new_cost_cube = new float[mat_length];
+	for (int i=0; i<ZPlanes; i++)
+	{
+		cv::Mat mat = cost_cube[i];
+		float* mat_arr = mat.isContinuous() ? (float*)mat.data : (float*)mat.clone().data;
+		std::copy(mat_arr, mat_arr+mat_length-1, new_cost_cube);
+	}*/
+
+	int* dev_width; int* dev_height; int* dev_zi; int* dev_half_window;
+	float* dev_znear; float* dev_zfar; float* dev_zplanes;
+	std::vector<double>* dev_cam_K; std::vector<double>* dev_cam_R; std::vector<double>* dev_cam_t; std::vector<double>* dev_ref_inv_K; std::vector<double>* dev_ref_inv_R; std::vector<double>* dev_ref_inv_t;
+	cv::Mat* dev_Y_cam; cv::Mat* dev_Y_ref;
+	std::vector<float*>* dev_cost_cube;
+
+	cudaSetDevice(0);
+
+	// width, height, zi, Znear, ZFar, ZPlanes, K, R, t, inv_K, inv_R, inv_t, window, Y_cam, Y_ref, cost_cube
+
+	cudaMalloc((void**)&dev_width, sizeof(int));
+	cudaMalloc((void**)&dev_height, sizeof(int));
+	cudaMalloc((void**)&dev_zi, sizeof(int));
+	cudaMalloc((void**)&dev_znear, sizeof(float));
+	cudaMalloc((void**)&dev_zfar, sizeof(float));
+	cudaMalloc((void**)&dev_zplanes, sizeof(float));
+	cudaMalloc((void**)&dev_half_window, sizeof(int));
+	cudaMalloc((void**)&dev_cam_K, 9 * sizeof(double));
+	cudaMalloc((void**)&dev_cam_R, 9 * sizeof(double));
+	cudaMalloc((void**)&dev_cam_t, 3 * sizeof(double));
+	cudaMalloc((void**)&dev_ref_inv_K, 9 * sizeof(double));
+	cudaMalloc((void**)&dev_ref_inv_R, 9 * sizeof(double));
+	cudaMalloc((void**)&dev_ref_inv_t, 3 * sizeof(double));
+	cudaMalloc((void**)&dev_Y_ref, ref.YUV[0].cols * ref.YUV[0].rows * sizeof(float));
+	cudaMalloc((void**)&dev_Y_cam, cam_1.YUV[0].cols * cam_1.YUV[0].rows * sizeof(float));
+	cudaMalloc((void**)&dev_cost_cube, ZPlanes * mat_length * sizeof(float));
+
+	cudaMemcpy(dev_width, &ref.width, sizeof(int), cudaMemcpyHostToDevice);
+	cudaMemcpy(dev_height, &ref.height, sizeof(int), cudaMemcpyHostToDevice);
+	cudaMemcpy(dev_zi, &zi, sizeof(int), cudaMemcpyHostToDevice);
+	cudaMemcpy(dev_znear, &ZNear, sizeof(float), cudaMemcpyHostToDevice);
+	cudaMemcpy(dev_zfar, &ZFar, sizeof(float), cudaMemcpyHostToDevice);
+	cudaMemcpy(dev_zplanes, &ZPlanes, sizeof(float), cudaMemcpyHostToDevice);
+	cudaMemcpy(dev_half_window, &half_window, sizeof(int), cudaMemcpyHostToDevice);
+	cudaMemcpy(dev_cam_K, &cam_1.p.K, 9 * sizeof(double), cudaMemcpyHostToDevice);
+	cudaMemcpy(dev_cam_R, &cam_1.p.R, 9 * sizeof(double), cudaMemcpyHostToDevice);
+	cudaMemcpy(dev_cam_t, &cam_1.p.t, 3 * sizeof(double), cudaMemcpyHostToDevice);
+	cudaMemcpy(dev_ref_inv_K, &ref.p.K_inv, 9 * sizeof(double), cudaMemcpyHostToDevice);
+	cudaMemcpy(dev_ref_inv_R, &ref.p.R_inv, 9 * sizeof(double), cudaMemcpyHostToDevice);
+	cudaMemcpy(dev_ref_inv_t, &ref.p.t_inv, 3 * sizeof(double), cudaMemcpyHostToDevice);
+	//cudaMemcpy(dev_Y_ref, &ref.YUV[0], ref.YUV[0].cols * ref.YUV[0].rows * sizeof(float), cudaMemcpyHostToDevice);
+	//cudaMemcpy(dev_Y_cam, &cam_1.YUV[0], mat_length * sizeof(float), cudaMemcpyHostToDevice);
+	//cudaMemcpy(dev_cost_cube, &new_cost_cube, ZPlanes * mat_length * sizeof(float), cudaMemcpyHostToDevice);
+
+	int N_threads = 1024;
+	dim3 thread_size(N_threads);
+	//dim3 block_size(((ref.height * ref.width) + N_threads - 1) / N_threads);
+	//std::cout << "thread size " << thread_size << ", block size " << block_size << std::endl;
+	//printf("Thread size %d, block size %d\n", thread_size, block_size);
+}

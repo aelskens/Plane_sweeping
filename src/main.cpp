@@ -1,6 +1,4 @@
 #include "../kernels/main.cuh"
-#include "cam_params.hpp"
-#include "constants.hpp"
 
 #include <cstdio>
 #include <vector>
@@ -319,9 +317,11 @@ int main()
 
 	// Test call a CUDA function
 	wrap_test_vectorAdd();
-	//std::vector<cv::Mat> cost_cube;
+	std::vector<cv::Mat> cost_cube;
 	//frame2frame_matching(cam_vector.at(0), cam_vector.at(1), cost_cube, 1, 3);
+
 	test(cam_vector.at(0).YUV[0]);
+	frame2frame_matching(cam_vector.at(0), cam_vector.at(1), cost_cube, 0, 5);
 
 	//// Test to take YUV matrix from a cam
 	////test_YUV_mat(cam_vector.at(0).YUV);
