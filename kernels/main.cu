@@ -113,15 +113,28 @@ void wrap_test_vectorAdd() {
 //cost /= cc;
 
 
-__global__ void compute_cost_naive(float* cost, float* cc, std::vector<cv::Mat> const& ref, std::vector<cv::Mat> const& cam, int* id_x, int* id_y, int N)
+// width, height, zi, Znear, ZFar, ZPlanes, K, R, t, inv_K, inv_R, inv_t, window, Y_cam, Y_ref, cost_cube
+__global__ void compute_cost_naive(int* width, int* height, int* zi, float* znear, float* zfar, float* ZPlanes, int* half_window,
+	std::vector<double> const& K, std::vector<double> const& R, std::vector<double> const& t, std::vector<double> const& inv_K, std::vector<double> const& inv_R, std::vector<double> const& inv_t,
+	cv::Mat const& ref, cv::Mat const& cam_1, std::vector<float*> &const cost_cube)
 {
 	int k = blockIdx.x * blockDim.x + threadIdx.x;
 	int l = blockIdx.y * blockDim.y + threadIdx.y;
 
-	if (k >= N || l >= N) return;
 
 	
 }
+
+__global__ void test_gpu(int* width, int* height, int* zi, float* znear, float* zfar, float* ZPlanes, int* half_window, double* K, double* R, double* t,
+	double* inv_K, double* inv_R, double* inv_t)
+{
+	int k = blockIdx.x * blockDim.x + threadIdx.x;
+	int l = blockIdx.y * blockDim.y + threadIdx.y;
+
+
+
+}
+
 
 void test(cv::Mat const& Y) {
 	cv::Mat* dev_Y;
@@ -162,9 +175,15 @@ void frame2frame_matching(cam &ref, cam &cam_1, std::vector<cv::Mat> &cost_cube,
 		std::copy(mat_arr, mat_arr+mat_length-1, new_cost_cube);
 	}*/
 
+	/*double K[9];
+	std::copy(cam_1.p.K.begin(), cam_1.p.K.end(), K);*/
+	double* K = &cam_1.p.K[0]; double* R = &cam_1.p.R[0]; double* t = &cam_1.p.t[0];
+	double* inv_K = &ref.p.K[0]; double* inv_R = &ref.p.R[0]; double* inv_t = &ref.p.t[0];
+
 	int* dev_width; int* dev_height; int* dev_zi; int* dev_half_window;
 	float* dev_znear; float* dev_zfar; float* dev_zplanes;
-	std::vector<double>* dev_cam_K; std::vector<double>* dev_cam_R; std::vector<double>* dev_cam_t; std::vector<double>* dev_ref_inv_K; std::vector<double>* dev_ref_inv_R; std::vector<double>* dev_ref_inv_t;
+	double* dev_K; double* dev_R; double* dev_t; double* dev_inv_K; double* dev_inv_R; double* dev_inv_t;
+	//std::vector<double>* dev_cam_K; std::vector<double>* dev_cam_R; std::vector<double>* dev_cam_t; std::vector<double>* dev_ref_inv_K; std::vector<double>* dev_ref_inv_R; std::vector<double>* dev_ref_inv_t;
 	cv::Mat* dev_Y_cam; cv::Mat* dev_Y_ref;
 	std::vector<float*>* dev_cost_cube;
 
@@ -179,12 +198,12 @@ void frame2frame_matching(cam &ref, cam &cam_1, std::vector<cv::Mat> &cost_cube,
 	cudaMalloc((void**)&dev_zfar, sizeof(float));
 	cudaMalloc((void**)&dev_zplanes, sizeof(float));
 	cudaMalloc((void**)&dev_half_window, sizeof(int));
-	cudaMalloc((void**)&dev_cam_K, 9 * sizeof(double));
-	cudaMalloc((void**)&dev_cam_R, 9 * sizeof(double));
-	cudaMalloc((void**)&dev_cam_t, 3 * sizeof(double));
-	cudaMalloc((void**)&dev_ref_inv_K, 9 * sizeof(double));
-	cudaMalloc((void**)&dev_ref_inv_R, 9 * sizeof(double));
-	cudaMalloc((void**)&dev_ref_inv_t, 3 * sizeof(double));
+	cudaMalloc((void**)&dev_K, 9 * sizeof(double));
+	cudaMalloc((void**)&dev_R, 9 * sizeof(double));
+	cudaMalloc((void**)&dev_t, 3 * sizeof(double));
+	cudaMalloc((void**)&dev_inv_K, 9 * sizeof(double));
+	cudaMalloc((void**)&dev_inv_R, 9 * sizeof(double));
+	cudaMalloc((void**)&dev_inv_t, 3 * sizeof(double));
 	cudaMalloc((void**)&dev_Y_ref, ref.YUV[0].cols * ref.YUV[0].rows * sizeof(float));
 	cudaMalloc((void**)&dev_Y_cam, cam_1.YUV[0].cols * cam_1.YUV[0].rows * sizeof(float));
 	cudaMalloc((void**)&dev_cost_cube, ZPlanes * mat_length * sizeof(float));
@@ -196,19 +215,32 @@ void frame2frame_matching(cam &ref, cam &cam_1, std::vector<cv::Mat> &cost_cube,
 	cudaMemcpy(dev_zfar, &ZFar, sizeof(float), cudaMemcpyHostToDevice);
 	cudaMemcpy(dev_zplanes, &ZPlanes, sizeof(float), cudaMemcpyHostToDevice);
 	cudaMemcpy(dev_half_window, &half_window, sizeof(int), cudaMemcpyHostToDevice);
-	cudaMemcpy(dev_cam_K, &cam_1.p.K, 9 * sizeof(double), cudaMemcpyHostToDevice);
-	cudaMemcpy(dev_cam_R, &cam_1.p.R, 9 * sizeof(double), cudaMemcpyHostToDevice);
-	cudaMemcpy(dev_cam_t, &cam_1.p.t, 3 * sizeof(double), cudaMemcpyHostToDevice);
-	cudaMemcpy(dev_ref_inv_K, &ref.p.K_inv, 9 * sizeof(double), cudaMemcpyHostToDevice);
-	cudaMemcpy(dev_ref_inv_R, &ref.p.R_inv, 9 * sizeof(double), cudaMemcpyHostToDevice);
-	cudaMemcpy(dev_ref_inv_t, &ref.p.t_inv, 3 * sizeof(double), cudaMemcpyHostToDevice);
-	//cudaMemcpy(dev_Y_ref, &ref.YUV[0], ref.YUV[0].cols * ref.YUV[0].rows * sizeof(float), cudaMemcpyHostToDevice);
-	//cudaMemcpy(dev_Y_cam, &cam_1.YUV[0], mat_length * sizeof(float), cudaMemcpyHostToDevice);
-	//cudaMemcpy(dev_cost_cube, &new_cost_cube, ZPlanes * mat_length * sizeof(float), cudaMemcpyHostToDevice);
+	cudaMemcpy(dev_K, &K, 9 * sizeof(double), cudaMemcpyHostToDevice);
+	cudaMemcpy(dev_R, &R, 9 * sizeof(double), cudaMemcpyHostToDevice);
+	cudaMemcpy(dev_t, &t, 3 * sizeof(double), cudaMemcpyHostToDevice);
+	cudaMemcpy(dev_inv_K, &inv_K, 9 * sizeof(double), cudaMemcpyHostToDevice);
+	cudaMemcpy(dev_inv_R, &inv_R, 9 * sizeof(double), cudaMemcpyHostToDevice);
+	cudaMemcpy(dev_inv_t, &inv_t, 3 * sizeof(double), cudaMemcpyHostToDevice);
+	/*cudaMemcpy(dev_Y_ref, &ref.YUV[0], mat_length * sizeof(float), cudaMemcpyHostToDevice);
+	cudaMemcpy(dev_Y_cam, &cam_1.YUV[0], mat_length * sizeof(float), cudaMemcpyHostToDevice);
+	cudaMemcpy(dev_cost_cube, &new_cost_cube, ZPlanes * mat_length * sizeof(float), cudaMemcpyHostToDevice);*/
 
 	int N_threads = 1024;
 	dim3 thread_size(N_threads);
-	//dim3 block_size(((ref.height * ref.width) + N_threads - 1) / N_threads);
+	dim3 block_size(((ref.height * ref.width) + N_threads - 1) / N_threads);
+
+	/*compute_cost_naive << <block_size, thread_size>> > (dev_width, dev_height, dev_zi, dev_znear, dev_zfar, dev_zplanes, dev_half_window, dev_cam_K,
+		dev_cam_R, dev_cam_t, dev_ref_inv_K, dev_ref_inv_R, dev_ref_inv_t, dev_Y_ref, dev_Y_cam, dev_cost_cube);*/
+
+	test_gpu << <block_size, thread_size >> > (dev_width, dev_height, dev_zi, dev_znear, dev_zfar, dev_zplanes, dev_half_window, dev_K, dev_R, dev_t,
+		dev_inv_K, dev_inv_R, dev_inv_t);
+
+	cudaGetLastError();
+	cudaDeviceReset();
+
+	cudaFree(dev_width);
+
+	
 	//std::cout << "thread size " << thread_size << ", block size " << block_size << std::endl;
-	//printf("Thread size %d, block size %d\n", thread_size, block_size);
+	printf("Thread size %d, block size %d\n", thread_size, block_size);
 }
