@@ -256,6 +256,44 @@ std::vector<cv::Mat> sweeping_plane_linear(cam const ref, std::vector<cam> const
 	return cost_cube;
 }
 
+std::vector<cv::Mat> sweeping_plane_cost_plane_gpu(cam const ref, std::vector<cam> const& cam_vector, int window = 3)
+{
+	// Initialization to MAX value
+	// std::vector<float> cost_cube(ref.width * ref.height * ZPlanes, 255.f);
+	std::vector<cv::Mat> cost_cube(ZPlanes);
+	for (int i = 0; i < cost_cube.size(); ++i)
+	{
+		cost_cube[i] = cv::Mat(ref.height, ref.width, CV_32FC1, 255.);
+	}
+
+	// For each camera in the setup (reference is skipped)
+	for (auto& cam : cam_vector)
+	{
+		if (cam.name == ref.name)
+			continue;
+
+		std::cout << "Cam: " << cam.name << std::endl;
+		// For each pixel and candidate: (i) calculate projection index, (ii) calculate cost against reference, (iii) store minimum cost
+		for (int zi = 0; zi < ZPlanes; zi++)
+		{
+			std::cout << "Plane " << zi << std::endl;
+			float* result = frame2frame_matching(ref, cam, cost_cube[zi], zi, window/2);
+			cv::Mat result_mat = cv::Mat(1080, 1920, CV_32FC1, result);
+			cost_cube[zi] = result_mat;
+		}
+	}
+
+	// Visualize costs
+	// for (int zi = 0; zi < ZPlanes; zi++)
+	// {
+	// 	std::cout << "plane " << zi << std::endl;
+	// 	cv::namedWindow("Cost", cv::WINDOW_NORMAL);
+	// 	cv::imshow("Cost", cost_cube.at(zi) / 255.f);
+	// 	cv::waitKey(0);
+	// }
+	return cost_cube;
+}
+
 cv::Mat find_min(std::vector<cv::Mat> const& cost_cube)
 {
 	const int zPlanes = cost_cube.size();
@@ -317,15 +355,17 @@ int main()
 
 	// Test call a CUDA function
 	wrap_test_vectorAdd();
-	std::vector<cv::Mat> cost_cube;
-	for (int i=0; i<256; i++) cost_cube.push_back(cv::Mat(1920, 1080, CV_32FC1));
 
-	//test(cam_vector.at(0).YUV[0]);
-	float* result = frame2frame_matching(cam_vector.at(0), cam_vector.at(1), cost_cube.at(0), 0, 5);
-	for (int k = 0; k < 1080*1920; k += 100000)  printf("main.cpp result %d cost_cube:%f\n", k, result[k]);
-	cv::Mat result_mat = cv::Mat(1080, 1920, CV_32FC1, result);
-	cost_cube.at(0) = result_mat;
-	for (int k = 0; k < 1080 * 1920; k += 100000)  printf("main.cpp cost_cube %d cost_cube:%f\n", k, cost_cube.at(0).at<float>(k/1920, k%1920));
+
+	//// Test passing parameters
+	//std::vector<cv::Mat> cost_cube;
+	//for (int i=0; i<256; i++) cost_cube.push_back(cv::Mat(1920, 1080, CV_32FC1));
+	////test(cam_vector.at(0).YUV[0]);
+	//float* result = frame2frame_matching(cam_vector.at(0), cam_vector.at(1), cost_cube.at(0), 0, 5);
+	//for (int k = 0; k < 1080*1920; k += 100000)  printf("main.cpp result %d cost_cube:%f\n", k, result[k]);
+	//cv::Mat result_mat = cv::Mat(1080, 1920, CV_32FC1, result);
+	//cost_cube.at(0) = result_mat;
+	//for (int k = 0; k < 1080 * 1920; k += 100000)  printf("main.cpp cost_cube %d cost_cube:%f\n", k, cost_cube.at(0).at<float>(k/1920, k%1920));
 
 	
 	/////////////////////////////////////////////////////////////////////////////
@@ -337,15 +377,16 @@ int main()
 	//// Sweeping algorithm for camera 0
 	//std::vector<cv::Mat> cost_cube = sweeping_plane(cam_vector.at(0), cam_vector, 5); // data type inn each Mat == float
 	//std::cout << typeid(cost_cube[0].at<float>(0, 0)).name() << std::endl; 
-	//std::vector<cv::Mat> cost_cube_linear = sweeping_plane_linear(cam_vector.at(0), cam_vector, 5);
+	//std::vector<cv::Mat> cost_cube = sweeping_plane_linear(cam_vector.at(0), cam_vector, 5);
+	std::vector<cv::Mat> cost_cube = sweeping_plane_cost_plane_gpu(cam_vector.at(0), cam_vector, 5);
 
-	//// Find min cost and generate depth map
-	//cv::Mat depth = find_min(cost_cube_linear);
-	//cv::namedWindow("Depth", cv::WINDOW_NORMAL);
-	//cv::imshow("Depth", depth);
-	//cv::waitKey(0);
+	// Find min cost and generate depth map
+	cv::Mat depth = find_min(cost_cube);
+	cv::namedWindow("Depth", cv::WINDOW_NORMAL);
+	cv::imshow("Depth", depth);
+	cv::waitKey(0);
 
-	//printf("%f", depth.at<float>(0, 0));
+	printf("%f", depth.at<float>(0, 0));
 
 	return 0;
 }

@@ -67,13 +67,73 @@ void wrap_test_vectorAdd() {
 __global__ void test_gpu(int* width, int* height, int* zi, float* znear, float* zfar, float* ZPlanes, int* half_window, double* K, double* R, double* t,
 	double* inv_K, double* inv_R, double* inv_t, float* cost_cube, uint8_t* y_ref, uint8_t* y_cam)
 {
-	int k = blockIdx.x * blockDim.x + threadIdx.x;
+	int p = blockIdx.x * blockDim.x + threadIdx.x;
 	//int l = blockIdx.y * blockDim.y + threadIdx.y;
 
-	cost_cube[k] = (float) k;
+	int x = p % width;
+	int y = p / width;
+
+	//cost_cube[k] = (float) k;
 	//if(k%100000==0) printf("GPU %d ref:%u cam:%u cost_cube:%f\n", k, y_ref[k], y_cam[k], cost_cube[k]);
 	//if(k<9) printf("GPU %d KRt %f %f %f\n", k, K[k], R[k], t[k]);
 
+	// Calculate z from ZNear, ZFar and ZPlanes (projective transformation) (zi = 0, z = ZFar)
+	double z = znear * zfar / (znear + (((double)zi / (double)ZPlanes) * (zfar - znear))); //need to be in the x and y loops?
+
+	// 2D ref camera point to 3D in ref camera coordinates (p * K_inv)
+	double X_ref = (inv_K[0] * x + inv_K[1] * y + inv_K[2]) * z;
+	double Y_ref = (inv_K[3] * x + inv_K[4] * y + inv_K[5]) * z;
+	double Z_ref = (inv_K[6] * x + inv_K[7] * y + inv_K[8]) * z;
+
+	// 3D in ref camera coordinates to 3D world
+	double X = inv_R[0] * X_ref + inv_R[1] * Y_ref + inv_R[2] * Z_ref - inv_t[0];
+	double Y = inv_R[3] * X_ref + inv_R[4] * Y_ref + inv_R[5] * Z_ref - inv_t[1];
+	double Z = inv_R[6] * X_ref + inv_R[7] * Y_ref + inv_R[8] * Z_ref - inv_t[2];
+
+	// 3D world to projected camera 3D coordinates
+	double X_proj = R[0] * X + R[1] * Y + R[2] * Z - t[0];
+	double Y_proj = R[3] * X + R[4] * Y + R[5] * Z - t[1];
+	double Z_proj = R[6] * X + R[7] * Y + R[8] * Z - t[2];
+
+	// Projected camera 3D coordinates to projected camera 2D coordinates
+	double x_proj = (K[0] * X_proj / Z_proj + K[1] * Y_proj / Z_proj + K[2]);
+	double y_proj = (K[3] * X_proj / Z_proj + K[4] * Y_proj / Z_proj + K[5]);
+	double z_proj = Z_proj;
+
+	x_proj = x_proj < 0 || x_proj >= width ? 0 : roundf(x_proj);
+	y_proj = y_proj < 0 || y_proj >= height ? 0 : roundf(y_proj);
+
+	// (ii) calculate cost against reference
+	// Calculating cost in a window
+	float cost = 0.0f;
+	float cc = 0.0f;
+	for (int k = -half_window; k <= half_window; k++)
+	{
+		for (int l = -half_window; l <= half_window; l++)
+		{
+			if (x + l < 0 || x + l >= width)
+				continue;
+			if (y + k < 0 || y + k >= height)
+				continue;
+			if (x_proj + l < 0 || x_proj + l >= width)
+				continue;
+			if (y_proj + k < 0 || y_proj + k >= height)
+				continue;
+
+			// Y
+			cost += fabs(y_ref.at<uint8_t>(y + k, x + l) - y_cam.at<uint8_t>((int)y_proj + k, (int)x_proj + l));
+			// U
+			// cost += fabs(ref.YUV[1].at<uint8_t >(y + k, x + l) - cam.YUV[1].at<uint8_t>((int)y_proj + k, (int)x_proj + l));
+			// V
+			// cost += fabs(ref.YUV[2].at<uint8_t >(y + k, x + l) - cam.YUV[2].at<uint8_t>((int)y_proj + k, (int)x_proj + l));
+			cc += 1.0f;
+		}
+	}
+	cost /= cc;
+
+	//  (iii) store minimum cost (arranged as cost images, e.g., first image = cost of every pixel for the first candidate)
+	// only the minimum cost for all the cameras is stored
+	cost_cube.at<float>(y, x) = fminf(cost_cube.at<float>(y, x), cost);
 }
 
 
@@ -97,7 +157,7 @@ float* frame2frame_matching(cam &ref, cam &cam_1, cv::Mat &cost_cube_plane, int 
 	printf("Naive cost frame2frame_matching:\n");
 
 	uint mat_length;
-	cv::Mat mat; //, result;
+	cv::Mat mat;
 
 	/*// Full cost cube
 	mat_length = cost_cube[0].total() * cost_cube[0].channels();
@@ -193,12 +253,12 @@ float* frame2frame_matching(cam &ref, cam &cam_1, cv::Mat &cost_cube_plane, int 
 	//CHK(cudaGetLastError());
 	cudaGetLastError();
 
-	printf("Avant print CPU");
+	//printf("Avant print CPU");
 
-	for(int k=0; k<mat_length; k+=100000)  printf("CPU0 new_cost_cube %d ref:%u cam:%u cost_cube:%f\n", k, y_ref[k], y_cam[k], new_cost_cube[k]);
+	//for(int k=0; k<mat_length; k+=100000)  printf("CPU0 new_cost_cube %d ref:%u cam:%u cost_cube:%f\n", k, y_ref[k], y_cam[k], new_cost_cube[k]);
 	//for (int k = 0; k < 9; k++) printf("CPU %d KRt %f %f %f\n", k, K[k], R[k], t[k]);
 	
-	printf("Thread size %d, block size %d\n", thread_size.x, block_size.x);
+	//printf("Thread size %d, block size %d\n", thread_size.x, block_size.x);
 
 	//CHK(cudaMemcpy(cost_cube_plane.data, dev_cost_cube, mat_length * sizeof(float), cudaMemcpyDeviceToHost));
 	CHK(cudaMemcpy(new_cost_cube, dev_cost_cube, mat_length * sizeof(float), cudaMemcpyDeviceToHost));
@@ -206,7 +266,7 @@ float* frame2frame_matching(cam &ref, cam &cam_1, cv::Mat &cost_cube_plane, int 
 	//cv::Mat result = cv::Mat(ref.width, ref.height, CV_32FC1, &new_cost_cube);
 	float* result = new_cost_cube;
 
-	for (int k = 0; k < mat_length; k += 100000)  printf("CPU1 new_cost_cube %d ref:%u cam:%u cost_cube:%f\n", k, y_ref[k], y_cam[k], new_cost_cube[k]);
+	//for (int k = 0; k < mat_length; k += 100000)  printf("CPU1 new_cost_cube %d ref:%u cam:%u cost_cube:%f\n", k, y_ref[k], y_cam[k], new_cost_cube[k]);
 	CHK(cudaFree(dev_width));
 	CHK(cudaDeviceReset());
 	return result;
