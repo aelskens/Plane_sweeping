@@ -318,16 +318,25 @@ int main()
 	// Test call a CUDA function
 	wrap_test_vectorAdd();
 	std::vector<cv::Mat> cost_cube;
-	//frame2frame_matching(cam_vector.at(0), cam_vector.at(1), cost_cube, 1, 3);
+	for (int i=0; i<256; i++) cost_cube.push_back(cv::Mat(1920, 1080, CV_32FC1));
 
-	test(cam_vector.at(0).YUV[0]);
-	frame2frame_matching(cam_vector.at(0), cam_vector.at(1), cost_cube, 0, 5);
+	//test(cam_vector.at(0).YUV[0]);
+	float* result = frame2frame_matching(cam_vector.at(0), cam_vector.at(1), cost_cube.at(0), 0, 5);
+	for (int k = 0; k < 1080*1920; k += 100000)  printf("main.cpp result %d cost_cube:%f\n", k, result[k]);
+	cv::Mat result_mat = cv::Mat(1080, 1920, CV_32FC1, result);
+	cost_cube.at(0) = result_mat;
+	for (int k = 0; k < 1080 * 1920; k += 100000)  printf("main.cpp cost_cube %d cost_cube:%f\n", k, cost_cube.at(0).at<float>(k/1920, k%1920));
 
+	
+	/////////////////////////////////////////////////////////////////////////////
 	//// Test to take YUV matrix from a cam
 	////test_YUV_mat(cam_vector.at(0).YUV);
 
+	
+	////////////////////////////////////////////////////////////////////////////
 	//// Sweeping algorithm for camera 0
-	////std::vector<cv::Mat> cost_cube = sweeping_plane(cam_vector.at(0), cam_vector, 5);
+	//std::vector<cv::Mat> cost_cube = sweeping_plane(cam_vector.at(0), cam_vector, 5); // data type inn each Mat == float
+	//std::cout << typeid(cost_cube[0].at<float>(0, 0)).name() << std::endl; 
 	//std::vector<cv::Mat> cost_cube_linear = sweeping_plane_linear(cam_vector.at(0), cam_vector, 5);
 
 	//// Find min cost and generate depth map

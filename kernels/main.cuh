@@ -14,6 +14,6 @@
 
 // This is the public interface of our cuda function, called directly in main.cpp
 void wrap_test_vectorAdd();
-void test(cv::Mat const &Y);
-void frame2frame_matching(cam &ref, cam &cam_1, std::vector<cv::Mat> &cost_cube, int zi, int half_window);
+//void test(cv::Mat const &Y);
+float* frame2frame_matching(cam &ref, cam &cam_1, cv::Mat &cost_cube_plane, int zi, int half_window);
 //void compute_cost_naive(float* cost, float* cc, std::vector<cv::Mat> const& ref, std::vector<cv::Mat> const& cam, int* id_x, int* id_y, int N);
