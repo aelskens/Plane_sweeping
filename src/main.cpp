@@ -277,7 +277,9 @@ std::vector<cv::Mat> sweeping_plane_cost_plane_gpu(cam ref, std::vector<cam> & c
 		for (int zi = 0; zi < ZPlanes; zi++)
 		{
 			std::cout << "Plane " << zi << std::endl;
-			float* result = frame2frame_matching(ref, cam, cost_cube[zi], zi, window/2);
+			//float* result = frame2frame_matching_naive_baseline(ref, cam, cost_cube[zi], zi, window/2);
+			//float* result = frame2frame_matching_naive_float(ref, cam, cost_cube[zi], zi, window/2);
+			float* result = frame2frame_matching_naive_float_2D(ref, cam, cost_cube[zi], zi, window / 2);
 			cv::Mat result_mat = cv::Mat(1080, 1920, CV_32FC1, result);
 			cost_cube[zi] = result_mat;
 		}
@@ -373,10 +375,10 @@ int main()
 	
 	////////////////////////////////////////////////////////////////////////////
 	//// Sweeping algorithm for camera 0
+	time_t start_time = time(0);
 	//std::vector<cv::Mat> cost_cube = sweeping_plane(cam_vector.at(0), cam_vector, 5); // data type inn each Mat == float
 	//std::cout << typeid(cost_cube[0].at<float>(0, 0)).name() << std::endl; 
 	//std::vector<cv::Mat> cost_cube = sweeping_plane_linear(cam_vector.at(0), cam_vector, 5);
-	time_t start_time = time(0);
 	std::vector<cv::Mat> cost_cube = sweeping_plane_cost_plane_gpu(cam_vector.at(0), cam_vector, 5);
 	time_t end_time = time(0);
 	int delta_time = (int) (end_time - start_time);
@@ -384,6 +386,9 @@ int main()
 
 	//// Find min cost and generate depth map
 	cv::Mat depth = find_min(cost_cube);
+	/*time_t second_end_time = time(0);
+	delta_time = (int)(second_end_time - end_time);
+	std::cout << "Elapsed time for find_min " << delta_time / 60 << "m" << delta_time % 60 << "s" << std::endl;*/
 	cv::namedWindow("Depth", cv::WINDOW_NORMAL);
 	cv::imshow("Depth", depth);
 	cv::waitKey(0);
