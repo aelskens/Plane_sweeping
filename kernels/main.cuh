@@ -19,5 +19,7 @@ void wrap_test_vectorAdd();
 //void test(cv::Mat const &Y);
 float* frame2frame_matching_naive_baseline(cam& ref, cam& cam_1, cv::Mat& cost_cube_plane, int zi, int half_window);
 float* frame2frame_matching_naive_float(cam& ref, cam& cam_1, cv::Mat& cost_cube_plane, int zi, int half_window);
-float* frame2frame_matching_naive_float_2D(cam &ref, cam &cam_1, cv::Mat &cost_cube_plane, int zi, int half_window);
+float* frame2frame_matching_naive_float_2D(cam& ref, cam& cam_1, cv::Mat& cost_cube_plane, int zi, int half_window);
+float* frame2frame_matching_partially_shared_float_2D(cam &ref, cam &cam_1, cv::Mat &cost_cube_plane, int zi, int half_window);
+float* frame2frame_matching_shared_float_2D(cam &ref, cam &cam_1, cv::Mat &cost_cube_plane, int zi, int half_window);
 //void compute_cost_naive(float* cost, float* cc, std::vector<cv::Mat> const& ref, std::vector<cv::Mat> const& cam, int* id_x, int* id_y, int N);
