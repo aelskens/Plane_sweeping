@@ -1,2 +1,8 @@
 build/*
 .vscode/*
+Depth*png
+libs/*
+out/*
+RemoteSystemsTempFiles/*
+.vs/*
+.metadata/*

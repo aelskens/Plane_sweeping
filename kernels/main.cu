@@ -590,7 +590,8 @@ __global__ void compute_cost_shared_float_2D(int* global_width, int* global_heig
 	int sub_y_cam_height = umax(cam_y_proj[2], cam_y_proj[3]) + half_window - min_cam_y + 1;
 	int shared_memory_flag = 1;
 
-	if (sub_y_cam_width * sub_y_cam_height > 2 * padding_length * padding_length) {
+	//if (sub_y_cam_width * sub_y_cam_height > 2 * padding_length * padding_length) {
+	if (sub_y_cam_width * sub_y_cam_height > padding_length * padding_length) {
 		//if (threadIdx.x == 0 && threadIdx.y == 0) printf("I am %d %d and in flag 0\n", blockIdx.x, blockIdx.y);
 		shared_memory_flag = 0;
 	}
@@ -640,15 +641,19 @@ __global__ void compute_cost_shared_float_2D(int* global_width, int* global_heig
 			// Y
 			
 			if (shared_memory_flag == 1) {
-				//cost += fabsf((float)sub_y_ref[MI(padding_x + l, padding_y + k, padding_length)] - (float)sub_y_cam[MI(x_proj2 - min_cam_x + l, y_proj2 - min_cam_y + k, sub_y_cam_width)]);
-				//cost += fabsf((float)sub_y_ref[MI(padding_x + l, padding_y + k, padding_length)]);
-				if (threadIdx.x == 0 && threadIdx.y == 0){
-					//printf("I am block %d, %d  sub_y_cam_element = %d, y_cam_element = %d \n", blockIdx.x, blockIdx.y, sub_y_cam[MI(x_proj2 - min_cam_x + l, y_proj2 - min_cam_y + k, sub_y_cam_width)], y_cam[MI(x_proj2 + l, y_proj2 + k, width)]);
-					printf("I am block %d, %d x_proj2 = %d, min_cam_x = %d, x_proj2 = %d, min_cam_x = %d, l = %d, k =  %d, sub_y_cam_element = %d, y_cam_element = %d \n", blockIdx.x, blockIdx.y, x_proj2, min_cam_x, y_proj2, min_cam_y, l, k, sub_y_cam[MI(x_proj2 - min_cam_x + l, y_proj2 - min_cam_y + k, sub_y_cam_width)], y_cam[MI(x_proj2 + l, y_proj2 + k, width)]);
+				if(x_proj2 - min_cam_x + l >= 0 && x_proj2 - min_cam_x + l < sub_y_cam_width && y_proj2 - min_cam_y + k >= 0 && y_proj2 - min_cam_y + k < sub_y_cam_height){
+					cost += fabsf((float)sub_y_ref[MI(padding_x + l, padding_y + k, padding_length)] - (float)sub_y_cam[MI(x_proj2 - min_cam_x + l, y_proj2 - min_cam_y + k, sub_y_cam_width)]);
+					//cost += fabsf((float)sub_y_ref[MI(padding_x + l, padding_y + k, padding_length)]);
 				}
+
+				//if (threadIdx.x == 0 && threadIdx.y == 0){
+				//	//printf("I am block %d, %d  sub_y_cam_element = %d, y_cam_element = %d \n", blockIdx.x, blockIdx.y, sub_y_cam[MI(x_proj2 - min_cam_x + l, y_proj2 - min_cam_y + k, sub_y_cam_width)], y_cam[MI(x_proj2 + l, y_proj2 + k, width)]);
+				//	printf("I am block %d, %d x_proj2 = %d, min_cam_x = %d, x_proj2 = %d, min_cam_x = %d, l = %d, k =  %d, sub_y_cam_element = %d, y_cam_element = %d \n", blockIdx.x, blockIdx.y, x_proj2, min_cam_x, y_proj2, min_cam_y, l, k, sub_y_cam[MI(x_proj2 - min_cam_x + l, y_proj2 - min_cam_y + k, sub_y_cam_width)], y_cam[MI(x_proj2 + l, y_proj2 + k, width)]);
+				//}
 			}
-			else 
+			else {
 				cost += fabsf((float)sub_y_ref[MI(padding_x + l, padding_y + k, padding_length)] - (float)y_cam[MI(x_proj2 + l, y_proj2 + k, width)]);
+			}
 			//cost += fabsf((float) sub_y_ref[MI(padding_x + l, padding_y + k, padding_length)]);
 			
 			// U
@@ -663,7 +668,8 @@ __global__ void compute_cost_shared_float_2D(int* global_width, int* global_heig
 
 	//  (iii) store minimum cost (arranged as cost images, e.g., first image = cost of every pixel for the first candidate)
 	// only the minimum cost for all the cameras is stored
-	cost_cube[MI(x, y, width)] = fminf(cost_cube[MI(x, y, width)], cost);
+	if (cost_cube[MI(x, y, width)] > cost) cost_cube[MI(x, y, width)]=cost;
+	//cost_cube[MI(x, y, width)] = fminf(cost_cube[MI(x, y, width)], cost);
 }
 
 void test(cv::Mat const& Y) {
@@ -683,7 +689,7 @@ void test(cv::Mat const& Y) {
 //void frame2frame_matching(cam& ref, cam& cam_1, std::vector<cv::Mat> &cost_cube, int zi, int half_window)
 float* frame2frame_matching_naive_baseline(cam &ref, cam &cam_1, cv::Mat &cost_cube_plane, int zi, int half_window)
 {
-	printf("Naive cost frame2frame_matching:\n");
+	printf("Naive double cost frame2frame_matching:\n");
 
 	uint mat_length;
 	cv::Mat mat;
@@ -792,7 +798,7 @@ float* frame2frame_matching_naive_baseline(cam &ref, cam &cam_1, cv::Mat &cost_c
 
 float* frame2frame_matching_naive_float(cam& ref, cam& cam_1, cv::Mat& cost_cube_plane, int zi, int half_window)
 {
-	printf("Naive cost frame2frame_matching:\n");
+	printf("Naive float 1D cost frame2frame_matching:\n");
 
 	uint mat_length;
 	cv::Mat mat;
@@ -901,7 +907,7 @@ float* frame2frame_matching_naive_float(cam& ref, cam& cam_1, cv::Mat& cost_cube
 
 float* frame2frame_matching_naive_float_2D(cam& ref, cam& cam_1, cv::Mat& cost_cube_plane, int zi, int half_window)
 {
-	printf("Naive cost frame2frame_matching:\n");
+	printf("Naive float 2D cost frame2frame_matching:\n");
 
 	uint mat_length;
 	cv::Mat mat;
@@ -1012,7 +1018,7 @@ float* frame2frame_matching_naive_float_2D(cam& ref, cam& cam_1, cv::Mat& cost_c
 
 float* frame2frame_matching_partially_shared_float_2D(cam& ref, cam& cam_1, cv::Mat& cost_cube_plane, int zi, int half_window)
 {
-	printf("Naive cost frame2frame_matching:\n");
+	printf("Partially shared float 2D cost frame2frame_matching:\n");
 
 	uint mat_length;
 	cv::Mat mat;
@@ -1119,7 +1125,7 @@ float* frame2frame_matching_partially_shared_float_2D(cam& ref, cam& cam_1, cv::
 
 float* frame2frame_matching_shared_float_2D(cam& ref, cam& cam_1, cv::Mat& cost_cube_plane, int zi, int half_window)
 {
-	printf("Naive cost frame2frame_matching:\n");
+	printf("Shared float 2D cost frame2frame_matching:\n");
 
 	uint mat_length;
 	cv::Mat mat;
