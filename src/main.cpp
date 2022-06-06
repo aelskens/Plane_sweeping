@@ -257,7 +257,7 @@ std::vector<cv::Mat> sweeping_plane_linear(cam const ref, std::vector<cam> const
 	return cost_cube;
 }
 
-std::vector<cv::Mat> sweeping_plane_cost_plane_gpu(cam ref, std::vector<cam> & cam_vector, int window = 3, int mode = 5)
+std::vector<cv::Mat> sweeping_plane_cost_plane_gpu(cam ref, std::vector<cam> & cam_vector, int window = 3, int mode = 11)
 {
 	// Initialization to MAX value
 	// std::vector<float> cost_cube(ref.width * ref.height * ZPlanes, 255.f);
@@ -270,15 +270,11 @@ std::vector<cv::Mat> sweeping_plane_cost_plane_gpu(cam ref, std::vector<cam> & c
 	// For each camera in the setup (reference is skipped)
 	for (cam cam : cam_vector)
 	{
-		if (cam.name == ref.name || cam.name != cam_vector.at(3).name)
+		if (cam.name == ref.name || mode >= 9)
 			continue;
-		/*if (cam.name == ref.name)
-			continue;*/
 
-		std::cout << "Cam: " << cam.name << std::endl;
 		// For each pixel and candidate: (i) calculate projection index, (ii) calculate cost against reference, (iii) store minimum cost
 		for (int zi = 0; zi < ZPlanes; zi++)
-		//for (int zi = 0; zi < 80; zi++)
 		{
 			float* result;
 			if(mode >= 6 && zi!=0) continue;
@@ -314,20 +310,17 @@ std::vector<cv::Mat> sweeping_plane_cost_plane_gpu(cam ref, std::vector<cam> & c
 			}
 
 			if (mode < 6){
-				std::cout << "Plane " << zi << std::endl;
 				cv::Mat result_mat = cv::Mat(1080, 1920, CV_32FC1, result);
 				cost_cube[zi] = result_mat;
 			}
-			else if (mode < 9) {
+			else {
 				for (int i = 0; i < 256; i++) {
 					cv::Mat result_mat = cv::Mat(1080, 1920, CV_32FC1, &result[i * ref.height * ref.width]);
-					//cost_cube[i] += result_mat / 3;
 					cost_cube[i] = result_mat;
 				}
 			} 
+
 		}
-		//std::cout << "Cam: " << cam.name << " for 80 planes"<< std::endl;
-		//break;
 	}
 
 	if (mode >= 9){
@@ -347,21 +340,41 @@ std::vector<cv::Mat> sweeping_plane_cost_plane_gpu(cam ref, std::vector<cam> & c
 
 		for (int i = 0; i < 256; i++) {
 			cv::Mat result_mat = cv::Mat(1080, 1920, CV_32FC1, &result[i * ref.height * ref.width]);
-			//cost_cube[i] += result_mat / 3;
 			cost_cube[i] = result_mat;
 		}
 	
 	}
 
-	// Visualize costs
-	 /*for (int zi = 0; zi < ZPlanes; zi++)
-	 {
-	 	std::cout << "plane " << zi << std::endl;
-	 	cv::namedWindow("Cost", cv::WINDOW_NORMAL);
-	 	cv::imshow("Cost", cost_cube.at(zi) / 255.f);
-	 	cv::waitKey(0);
-	 }*/
 	return cost_cube;
+}
+
+cv::Mat sweeping_plane_cost_plane_and_findmin_gpu(cam ref, std::vector<cam>& cam_vector, int window = 3, int mode = 3)
+{
+	float* float_result;
+	uint8_t* uint8_t_result;
+	cv::Mat tmp_depth, depth;
+
+	switch (mode) {
+		case 0:
+			float_result = frame2frame_matching_reduced_float_all_no_fill_better_pad_smart_full_shared_full_float_2D(ref, cam_vector, window / 2);
+			tmp_depth = cv::Mat(ref.height, ref.width, CV_32FC1, &float_result[0]);
+			tmp_depth.convertTo(depth, CV_8U);
+			//free(float_result);
+			break;
+		case 1:
+			uint8_t_result = frame2frame_matching_reduced_uint8_t_all_no_fill_better_pad_smart_full_shared_full_float_2D(ref, cam_vector, window / 2);
+			depth = cv::Mat(ref.height, ref.width, CV_8U, &uint8_t_result[0]);
+			//free(uint8_t_result);
+			break;
+		case 2:
+			uint8_t_result = frame2frame_matching_reduced_uint8_t_all_no_fill_better_pad_less_global_smart_full_shared_full_float_2D(ref, cam_vector, window / 2);
+			depth = cv::Mat(ref.height, ref.width, CV_8U, &uint8_t_result[0]);
+			//free(uint8_t_result);
+			break;
+	}
+
+
+	return depth;
 }
 
 cv::Mat find_min(std::vector<cv::Mat> const& cost_cube)
@@ -391,100 +404,88 @@ cv::Mat find_min(std::vector<cv::Mat> const& cost_cube)
 	return depth;
 }
 
-// Test to take YUV matrix from a cam
-void test_YUV_mat(std::vector<cv::Mat> const &YUV)
-{
-	/*cv::namedWindow("Y", cv::WindowFlags::WINDOW_AUTOSIZE);
-	cv::imshow("Y", YUV[0]);
-	cv::namedWindow("U", cv::WindowFlags::WINDOW_AUTOSIZE);
-	cv::imshow("U", YUV[1]);
-	cv::namedWindow("V", cv::WindowFlags::WINDOW_AUTOSIZE);
-	cv::imshow("V", YUV[2]);
-	cv::waitKey(0);*/
-	printf("rows %i\n", YUV[0].rows);
-	printf("columns %i\n", YUV[0].cols);
-
-	// type(element) in Y from YUV == double bad for GPU?
-	/*int i = 0;
-	cv::MatConstIterator_<double> it = YUV[0].begin<double>(), it_end = YUV[0].end<double>();
-	for (; it != it_end; it++) {
-		float r = *it;
-		std::cout << r << "\n" << std::endl;
-		std::cout << *it << "\n" << std::endl;
-		std::cout << typeid(*it).name() << std::endl;
-		break;
-	}*/
-}
 
 int main()
 {
 	// Read cams
+	std::chrono::steady_clock::time_point begin_read = std::chrono::steady_clock::now();
 	std::vector<cam> cam_vector = read_cams("data");
-
-	// Test call a CUDA function
-	//wrap_test_vectorAdd();
-
-
-	//// Test passing parameters
-	//std::vector<cv::Mat> cost_cube;
-	//for (int i=0; i<256; i++) cost_cube.push_back(cv::Mat(1920, 1080, CV_32FC1));
-	////test(cam_vector.at(0).YUV[0]);
-	//float* result = frame2frame_matching(cam_vector.at(0), cam_vector.at(1), cost_cube.at(0), 0, 5);
-	//for (int k = 0; k < 1080*1920; k += 100000)  printf("main.cpp result %d cost_cube:%f\n", k, result[k]);
-	//cv::Mat result_mat = cv::Mat(1080, 1920, CV_32FC1, result);
-	//cost_cube.at(0) = result_mat;
-	//for (int k = 0; k < 1080 * 1920; k += 100000)  printf("main.cpp cost_cube %d cost_cube:%f\n", k, cost_cube.at(0).at<float>(k/1920, k%1920));
-
+	std::chrono::steady_clock::time_point end_read = std::chrono::steady_clock::now();
+	int delta_time_read = (int)std::chrono::duration_cast<std::chrono::milliseconds>(end_read - begin_read).count();
+	std::cout << "Elapsed time for read_cam " << delta_time_read << "[ms]" << std::endl;
 	
-	/////////////////////////////////////////////////////////////////////////////
-	//// Test to take YUV matrix from a cam
-	////test_YUV_mat(cam_vector.at(0).YUV);
+	// Warm-up
+	wrap_test_vectorAdd();
 
-	
-	////////////////////////////////////////////////////////////////////////////
-	//// Sweeping algorithm for camera 0
 
-	//std::vector<cv::Mat> cost_cube = sweeping_plane(cam_vector.at(0), cam_vector, 5); // data type inn each Mat == float
-	//std::cout << typeid(cost_cube[0].at<float>(0, 0)).name() << std::endl; 
-	/*std::vector<cv::Mat> cost_cube = sweeping_plane_linear(cam_vector.at(0), cam_vector, 5);
-	cv::Mat depth = find_min(cost_cube);
-	std::string name = "../../screenshots/All_cams/CPU.png";
-	cv::imwrite(name, depth);*/
 
 	std::vector<cv::Mat> cost_cube;
-	std::string versions[10] = {"Naive_float", "Partially_shared_float", "Shared_float", "Shared_full_float", "Smart_naive_full_float", "Smart_shared_full_float", "Smart_full_shared_full_float", "Smart_all_cams_full_shared_full_float", "Smart_all_cams_no_fill_full_shared_full_float", "Smart_all_cams_no_fill_better_pad_full_shared_full_float" };
 
-	for (int i=10; i<12; i++) {
+	
+
+	/////////////////
+	// CPU
+
+	//std::chrono::steady_clock::time_point begin_CPU = std::chrono::steady_clock::now();
+	//cost_cube = sweeping_plane(cam_vector.at(0), cam_vector, 5); 
+	////std::vector<cv::Mat> cost_cube = sweeping_plane_linear(cam_vector.at(0), cam_vector, 5);
+	//cv::Mat depth = find_min(cost_cube);
+	//std::chrono::steady_clock::time_point end_CPU = std::chrono::steady_clock::now();
+	//int delta_time_CPU = (int)std::chrono::duration_cast<std::chrono::milliseconds>(end_CPU - begin_CPU).count();
+	//std::cout << "Elapsed time CPU " << delta_time_CPU << "[ms]" << std::endl;
+	//std::string name = "../../screenshots/All_cams/CPU.png";
+	//cv::imwrite(name, depth);
+
+
+	//////////
+	// GPU cost_cube
+
+	std::string versions[12] = {"Naive_baseline", "Naive_float", "Naive_float_2D", "Partially_shared_float", "Shared_float", "Shared_full_float", "Smart_naive_full_float", "Smart_shared_full_float", "Smart_full_shared_full_float", "Smart_all_cams_full_shared_full_float", "Smart_all_cams_no_fill_full_shared_full_float", "Smart_all_cams_no_fill_better_pad_full_shared_full_float" };
+
+	for (int i=11; i<12; i++) {
+		std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
+		cost_cube = sweeping_plane_cost_plane_gpu(cam_vector.at(0), cam_vector, 5, i);
+		std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+		int delta_time = (int)std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
+		std::cout << "Elapsed time " << versions[i] << " " << delta_time << "[ms]" << std::endl;
+
+		begin = std::chrono::steady_clock::now();
+		cv::Mat depth = find_min(cost_cube);
+		end = std::chrono::steady_clock::now();
+		delta_time = (int)std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
+		std::cout << "Elapsed time find_min " << delta_time << "[ms]" << std::endl;
+
+		std::string name = "../../screenshots/All_cams/" + versions[i] + ".png";
+		cv::imwrite(name, depth); 
+		/*cv::namedWindow("Depth", cv::WINDOW_NORMAL);
+		cv::imshow("Depth", depth);
+		cv::waitKey(0);*/
+	}
+
+	////////
+	// GPU depth map
+
+	std::string versions2[3] = { "Reduced_float_smart_all_cams_no_fill_better_pad_full_shared_full_float", "Reduced_uint8_t_smart_all_cams_no_fill_better_pad_full_shared_full_float", "Reduced_uint8_t_smart_all_cams_no_fill_better_pad_less_global_full_shared_full_float"};
+
+	for (int i = 3; i < 3; i++) {
 		//time_t start_time = time(0);
 		std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
 
-		cost_cube = sweeping_plane_cost_plane_gpu(cam_vector.at(0), cam_vector, 5, i);
+		cv::Mat depth = sweeping_plane_cost_plane_and_findmin_gpu(cam_vector.at(0), cam_vector, 5, i);
 
 		//time_t end_time = time(0);
 		//int delta_time = (int) (end_time - start_time);
 		std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
 		int delta_time = (int)std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
 		//std::cout << "Elapsed time " << delta_time/60 << "m" << delta_time%60  << "s"<< std::endl;
-		std::cout << "Elapsed time " << delta_time << "[ms]" << std::endl;
-		cv::Mat depth = find_min(cost_cube);
-		/*std::string name = "../../screenshots/All_cams/" + versions[i-2] + ".png";
-		cv::imwrite(name, depth); */
-		cv::namedWindow("Depth", cv::WINDOW_NORMAL);
+		std::cout << "Elapsed time " << versions2[i] << " " << delta_time << "[ms]" << std::endl;
+		std::string name = "../../screenshots/All_cams/" + versions2[i] + ".png";
+		cv::imwrite(name, depth);
+		/*cv::namedWindow("Depth", cv::WINDOW_NORMAL);
 		cv::imshow("Depth", depth);
-		cv::waitKey(0);
+		cv::waitKey(0);*/
 	}
 
-	////// Find min cost and generate depth map
-	//cv::Mat depth = find_min(cost_cube);
-	///*time_t second_end_time = time(0);
-	//delta_time = (int)(second_end_time - end_time);
-	//std::cout << "Elapsed time for find_min " << delta_time / 60 << "m" << delta_time % 60 << "s" << std::endl;*/
-	//cv::namedWindow("Depth", cv::WINDOW_NORMAL);
-	//cv::imshow("Depth", depth);
-	////cv::imwrite("../Depth_shared_maybe_fixed_1.png", depth);
-	//cv::waitKey(0);
-
-	//printf("%f", depth.at<float>(0, 0));
 
 	return 0;
 }

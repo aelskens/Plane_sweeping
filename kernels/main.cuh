@@ -28,5 +28,8 @@ float* frame2frame_matching_smart_shared_full_float_2D(cam& ref, cam& cam_1, std
 float* frame2frame_matching_smart_full_shared_full_float_2D(cam& ref, cam& cam_1, std::vector<cv::Mat>& cost_cube, int half_window);
 float* frame2frame_matching_all_smart_full_shared_full_float_2D(cam& ref, std::vector<cam>& cam_vector, std::vector<cv::Mat>& cost_cube, int half_window);
 float* frame2frame_matching_all_no_fill_smart_full_shared_full_float_2D(cam& ref, std::vector<cam>& cam_vector, std::vector<cv::Mat>& cost_cube, int half_window);
-float* frame2frame_matching_all_no_fill_better_pad_smart_full_shared_full_float_2D(cam& ref, std::vector<cam>& cam_vector, std::vector<cv::Mat> &cost_cube, int half_window);
+float* frame2frame_matching_all_no_fill_better_pad_smart_full_shared_full_float_2D(cam& ref, std::vector<cam>& cam_vector, std::vector<cv::Mat>& cost_cube, int half_window);
+float* frame2frame_matching_reduced_float_all_no_fill_better_pad_smart_full_shared_full_float_2D(cam& ref, std::vector<cam>& cam_vector, int half_window);
+uint8_t* frame2frame_matching_reduced_uint8_t_all_no_fill_better_pad_smart_full_shared_full_float_2D(cam& ref, std::vector<cam>& cam_vector, int half_window);
+uint8_t* frame2frame_matching_reduced_uint8_t_all_no_fill_better_pad_less_global_smart_full_shared_full_float_2D(cam& ref, std::vector<cam>& cam_vector, int half_window);
 //void compute_cost_naive(float* cost, float* cc, std::vector<cv::Mat> const& ref, std::vector<cv::Mat> const& cam, int* id_x, int* id_y, int N);
