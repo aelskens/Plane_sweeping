@@ -29,29 +29,19 @@ std::vector<cam> read_cams(std::string const& folder)
 		cv::Mat im_yuv;
 		const int width = im_rgb.cols;
 		const int height = im_rgb.rows;
-		//printf("width = %d, height = %d\n", width, height);
 
 		// Convert to YUV420
-		cv::cvtColor(im_rgb, im_yuv, cv::COLOR_BGR2YUV_I420); // uint8_t; cv::COLOR_BGR2YUV is equivalent to R+G+B/3
+		cv::cvtColor(im_rgb, im_yuv, cv::COLOR_BGR2YUV_I420); 
 		const int size = width * height * 1.5; // YUV 420
 
 		std::vector<cv::Mat> YUV;
 		cv::split(im_yuv, YUV);
-		/*printf("imYUVwidth = %d, imYUVheight = %d\n", im_yuv.cols, im_yuv.rows);
-		printf("Ywidth = %d, Yheight = %d\n", YUV[0].cols, YUV[0].rows);
-		printf("Uwidth = %d, Uheight = %d\n", YUV[1].cols, YUV[1].rows);
-		printf("Vwidth = %d, Vheight = %d\n", YUV[2].cols, YUV[2].rows);*/
 
 		// Params
 		cam_array.at(i) = cam(name, width, height, size, YUV, cam_params_vector.at(i));
 	}
 
 	return cam_array;
-
-	// cv::Mat U(height / 2, width / 2, CV_8UC1, cam_array.at(0).image.data() + (int)(width * height * 1.25));
-	// cv::namedWindow("im", cv::WINDOW_NORMAL);
-	// cv::imshow("im", U);
-	// cv::waitKey(0);
 }
 
 std::vector<cv::Mat> sweeping_plane(cam const ref, std::vector<cam> const& cam_vector, int window = 3)
@@ -143,14 +133,6 @@ std::vector<cv::Mat> sweeping_plane(cam const ref, std::vector<cam> const& cam_v
 		}
 	}
 
-	// Visualize costs
-	// for (int zi = 0; zi < ZPlanes; zi++)
-	// {
-	// 	std::cout << "plane " << zi << std::endl;
-	// 	cv::namedWindow("Cost", cv::WINDOW_NORMAL);
-	// 	cv::imshow("Cost", cost_cube.at(zi) / 255.f);
-	// 	cv::waitKey(0);
-	// }
 	return cost_cube;
 }
 
@@ -179,11 +161,6 @@ std::vector<cv::Mat> sweeping_plane_linear(cam const ref, std::vector<cam> const
 			{
 				int x = p % ref.width;
 				int y = p / ref.width;
-
-
-				/*if (p % 500 == 0)
-					printf("p = %d, x = %d, y = %d\n", p, x, y);*/
-					// (i) calculate projection index
 
 				// Calculate z from ZNear, ZFar and ZPlanes (projective transformation) (zi = 0, z = ZFar)
 				double z = ZNear * ZFar / (ZNear + (((double)zi / (double)ZPlanes) * (ZFar - ZNear))); //need to be in the x and y loops?
@@ -246,21 +223,12 @@ std::vector<cv::Mat> sweeping_plane_linear(cam const ref, std::vector<cam> const
 		}
 	}
 
-	// Visualize costs
-	// for (int zi = 0; zi < ZPlanes; zi++)
-	// {
-	// 	std::cout << "plane " << zi << std::endl;
-	// 	cv::namedWindow("Cost", cv::WINDOW_NORMAL);
-	// 	cv::imshow("Cost", cost_cube.at(zi) / 255.f);
-	// 	cv::waitKey(0);
-	// }
 	return cost_cube;
 }
 
 std::vector<cv::Mat> sweeping_plane_cost_plane_gpu(cam ref, std::vector<cam> & cam_vector, int window = 3, int mode = 11)
 {
 	// Initialization to MAX value
-	// std::vector<float> cost_cube(ref.width * ref.height * ZPlanes, 255.f);
 	std::vector<cv::Mat> cost_cube(ZPlanes);
 	for (int i = 0; i < cost_cube.size(); ++i)
 	{
@@ -271,7 +239,7 @@ std::vector<cv::Mat> sweeping_plane_cost_plane_gpu(cam ref, std::vector<cam> & c
 	for (cam cam : cam_vector)
 	{
 		if (cam.name == ref.name || mode >= 9)
-			continue;
+				continue;
 
 		// For each pixel and candidate: (i) calculate projection index, (ii) calculate cost against reference, (iii) store minimum cost
 		for (int zi = 0; zi < ZPlanes; zi++)
@@ -359,17 +327,14 @@ cv::Mat sweeping_plane_cost_plane_and_findmin_gpu(cam ref, std::vector<cam>& cam
 			float_result = frame2frame_matching_reduced_float_all_no_fill_better_pad_smart_full_shared_full_float_2D(ref, cam_vector, window / 2);
 			tmp_depth = cv::Mat(ref.height, ref.width, CV_32FC1, &float_result[0]);
 			tmp_depth.convertTo(depth, CV_8U);
-			//free(float_result);
 			break;
 		case 1:
 			uint8_t_result = frame2frame_matching_reduced_uint8_t_all_no_fill_better_pad_smart_full_shared_full_float_2D(ref, cam_vector, window / 2);
 			depth = cv::Mat(ref.height, ref.width, CV_8U, &uint8_t_result[0]);
-			//free(uint8_t_result);
 			break;
 		case 2:
 			uint8_t_result = frame2frame_matching_reduced_uint8_t_all_no_fill_better_pad_less_global_smart_full_shared_full_float_2D(ref, cam_vector, window / 2);
 			depth = cv::Mat(ref.height, ref.width, CV_8U, &uint8_t_result[0]);
-			//free(uint8_t_result);
 			break;
 	}
 
@@ -426,15 +391,15 @@ int main()
 	/////////////////
 	// CPU
 
-	//std::chrono::steady_clock::time_point begin_CPU = std::chrono::steady_clock::now();
-	//cost_cube = sweeping_plane(cam_vector.at(0), cam_vector, 5); 
-	////std::vector<cv::Mat> cost_cube = sweeping_plane_linear(cam_vector.at(0), cam_vector, 5);
-	//cv::Mat depth = find_min(cost_cube);
-	//std::chrono::steady_clock::time_point end_CPU = std::chrono::steady_clock::now();
-	//int delta_time_CPU = (int)std::chrono::duration_cast<std::chrono::milliseconds>(end_CPU - begin_CPU).count();
-	//std::cout << "Elapsed time CPU " << delta_time_CPU << "[ms]" << std::endl;
-	//std::string name = "../../screenshots/All_cams/CPU.png";
-	//cv::imwrite(name, depth);
+	std::chrono::steady_clock::time_point begin_CPU = std::chrono::steady_clock::now();
+	cost_cube = sweeping_plane(cam_vector.at(0), cam_vector, 5); 
+	//std::vector<cv::Mat> cost_cube = sweeping_plane_linear(cam_vector.at(0), cam_vector, 5);
+	cv::Mat depth = find_min(cost_cube);
+	std::chrono::steady_clock::time_point end_CPU = std::chrono::steady_clock::now();
+	int delta_time_CPU = (int)std::chrono::duration_cast<std::chrono::milliseconds>(end_CPU - begin_CPU).count();
+	std::cout << "Elapsed time CPU " << delta_time_CPU << "[ms]" << std::endl;
+	std::string name = "../../screenshots/All_cams/CPU.png";
+	cv::imwrite(name, depth);
 
 
 	//////////
@@ -442,7 +407,7 @@ int main()
 
 	std::string versions[12] = {"Naive_baseline", "Naive_float", "Naive_float_2D", "Partially_shared_float", "Shared_float", "Shared_full_float", "Smart_naive_full_float", "Smart_shared_full_float", "Smart_full_shared_full_float", "Smart_all_cams_full_shared_full_float", "Smart_all_cams_no_fill_full_shared_full_float", "Smart_all_cams_no_fill_better_pad_full_shared_full_float" };
 
-	for (int i=11; i<12; i++) {
+	for (int i=0; i<12; i++) {
 		std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
 		cost_cube = sweeping_plane_cost_plane_gpu(cam_vector.at(0), cam_vector, 5, i);
 		std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
@@ -467,7 +432,7 @@ int main()
 
 	std::string versions2[3] = { "Reduced_float_smart_all_cams_no_fill_better_pad_full_shared_full_float", "Reduced_uint8_t_smart_all_cams_no_fill_better_pad_full_shared_full_float", "Reduced_uint8_t_smart_all_cams_no_fill_better_pad_less_global_full_shared_full_float"};
 
-	for (int i = 3; i < 3; i++) {
+	for (int i = 0; i < 3; i++) {
 		//time_t start_time = time(0);
 		std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
 

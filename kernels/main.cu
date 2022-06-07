@@ -3,7 +3,7 @@
 #include <cstdio>
 #include <iostream>
 
-#define N_THREADS 16
+#define N_THREADS 32
 #define MI(x, y, width) ((x) + (y) * (width))
 #define MI3(x, y, z, width, height) ((x) + ((y) + (z) * (height)) * (width))
 
@@ -29,8 +29,6 @@ __constant__ float const_t[3*3];
 __constant__ float const_inv_K[9];
 __constant__ float const_inv_R[9];
 __constant__ float const_inv_t[3];
-//__constant__ uint8_t const_y_ref[];
-//__constant__ uint8_t const_y_cam[];
 __constant__ int const_cam_count[1];
 
 // Those functions are an example on how to call cuda functions from the main.cpp
@@ -44,8 +42,6 @@ __global__ void dev_test_vecAdd(int* A, int* B, int* C, int N)
 }
 
 void wrap_test_vectorAdd() {
-	//printf("Vector Add:\n");
-
 	int N = 3;
 	int a[] = { 1, 2, 3 };
 	int b[] = { 1, 2, 3 };
@@ -68,12 +64,6 @@ void wrap_test_vectorAdd() {
 		cudaMemcpyDeviceToHost);
 
 	cudaDeviceSynchronize();
-
-	//printf("%s\n", cudaGetErrorString(cudaGetLastError()));
-
-	/*for (int i = 0; i < N; ++i) {
-		printf("%i + %i = %i\n", a[i], b[i], c[i]);
-	}*/
 }
 
 
@@ -117,7 +107,6 @@ __global__ void compute_cost_naive_baseline(int* width, int* height, int* zi, fl
 	// Projected camera 3D coordinates to projected camera 2D coordinates
 	double x_proj = (K[0] * X_proj / Z_proj + K[1] * Y_proj / Z_proj + K[2]);
 	double y_proj = (K[3] * X_proj / Z_proj + K[4] * Y_proj / Z_proj + K[5]);
-	double z_proj = Z_proj;
 
 	x_proj = x_proj < 0 || x_proj >= *width ? 0 : roundf(x_proj);
 	y_proj = y_proj < 0 || y_proj >= *height ? 0 : roundf(y_proj);
@@ -185,7 +174,6 @@ __global__ void compute_cost_naive_float(int* width, int* height, float* zi, flo
 	// Projected camera 3D coordinates to projected camera 2D coordinates
 	float x_proj = (K[0] * X_proj / Z_proj + K[1] * Y_proj / Z_proj + K[2]);
 	float y_proj = (K[3] * X_proj / Z_proj + K[4] * Y_proj / Z_proj + K[5]);
-	float z_proj = Z_proj;
 
 	int x_proj2 = x_proj < 0 || x_proj >= *width ? 0 : (int) roundf(x_proj);
 	int y_proj2 = y_proj < 0 || y_proj >= *height ? 0 : (int) roundf(y_proj);
@@ -253,7 +241,6 @@ __global__ void compute_cost_naive_float_2D(int* width, int* height, float* zi, 
 	// Projected camera 3D coordinates to projected camera 2D coordinates
 	float x_proj = (K[0] * X_proj / Z_proj + K[1] * Y_proj / Z_proj + K[2]);
 	float y_proj = (K[3] * X_proj / Z_proj + K[4] * Y_proj / Z_proj + K[5]);
-	float z_proj = Z_proj;
 
 	int x_proj2 = x_proj < 0 || x_proj >= *width ? 0 : (int)roundf(x_proj);
 	int y_proj2 = y_proj < 0 || y_proj >= *height ? 0 : (int)roundf(y_proj);
@@ -359,7 +346,6 @@ __global__ void compute_cost_partially_shared_float_2D(int* global_width, int* g
 	// Projected camera 3D coordinates to projected camera 2D coordinates
 	float x_proj = (K[0] * X_proj / Z_proj + K[1] * Y_proj / Z_proj + K[2]);
 	float y_proj = (K[3] * X_proj / Z_proj + K[4] * Y_proj / Z_proj + K[5]);
-	float z_proj = Z_proj;
 
 	int x_proj2 = x_proj < 0 || x_proj >= width ? 0 : (int)roundf(x_proj);
 	int y_proj2 = y_proj < 0 || y_proj >= height ? 0 : (int)roundf(y_proj);
@@ -654,18 +640,12 @@ __global__ void compute_cost_shared_float_2D(int* global_width, int* global_heig
 			if (shared_memory_flag == 1) {
 				if(x_proj2 - min_cam_x + l >= 0 && x_proj2 - min_cam_x + l < sub_y_cam_width && y_proj2 - min_cam_y + k >= 0 && y_proj2 - min_cam_y + k < sub_y_cam_height){
 					cost += fabsf((float)sub_y_ref[MI(padding_x + l, padding_y + k, padding_length)] - (float)sub_y_cam[MI(x_proj2 - min_cam_x + l, y_proj2 - min_cam_y + k, sub_y_cam_width)]);
-					//cost += fabsf((float)sub_y_ref[MI(padding_x + l, padding_y + k, padding_length)]);
 				}
 
-				//if (threadIdx.x == 0 && threadIdx.y == 0){
-				//	//printf("I am block %d, %d  sub_y_cam_element = %d, y_cam_element = %d \n", blockIdx.x, blockIdx.y, sub_y_cam[MI(x_proj2 - min_cam_x + l, y_proj2 - min_cam_y + k, sub_y_cam_width)], y_cam[MI(x_proj2 + l, y_proj2 + k, width)]);
-				//	printf("I am block %d, %d x_proj2 = %d, min_cam_x = %d, x_proj2 = %d, min_cam_x = %d, l = %d, k =  %d, sub_y_cam_element = %d, y_cam_element = %d \n", blockIdx.x, blockIdx.y, x_proj2, min_cam_x, y_proj2, min_cam_y, l, k, sub_y_cam[MI(x_proj2 - min_cam_x + l, y_proj2 - min_cam_y + k, sub_y_cam_width)], y_cam[MI(x_proj2 + l, y_proj2 + k, width)]);
-				//}
 			}
 			else {
 				cost += fabsf((float)sub_y_ref[MI(padding_x + l, padding_y + k, padding_length)] - (float)y_cam[MI(x_proj2 + l, y_proj2 + k, width)]);
 			}
-			//cost += fabsf((float) sub_y_ref[MI(padding_x + l, padding_y + k, padding_length)]);
 			cc += 1.0f;
 		}
 	}
@@ -675,54 +655,18 @@ __global__ void compute_cost_shared_float_2D(int* global_width, int* global_heig
 	//  (iii) store minimum cost (arranged as cost images, e.g., first image = cost of every pixel for the first candidate)
 	// only the minimum cost for all the cameras is stored
 	if (cost_cube[MI(x, y, width)] > cost) cost_cube[MI(x, y, width)]=cost;
-	//cost_cube[MI(x, y, width)] = fminf(cost_cube[MI(x, y, width)], cost);
 }
 
-//__global__ void compute_cost_shared_full_float_2D(const int* global_width, const int* global_height, const float* global_zi, const float* global_znear, const float* global_zfar,
-//	float* global_ZPlanes, const int* global_half_window, const float* global_K, const float* global_R, const float* global_t, const float* global_inv_K,
-//	const float* global_inv_R, float* global_inv_t, float* cost_cube, const uint8_t* y_ref, const uint8_t* y_cam)
 __global__ void compute_cost_shared_full_float_2D(float* cost_cube, const float* y_ref, const float* y_cam)
 {
-	//if (threadIdx.x == 0 && threadIdx.y == 0) printf("I am initial block %d, %d\n", blockIdx.x, blockIdx.y);
 	int x = blockIdx.x * blockDim.x + threadIdx.x;
 	int y = blockIdx.y * blockDim.y + threadIdx.y;
 	
-	/*__shared__ int width;
-	__shared__ int height;
-	__shared__ float zi;
-	__shared__ float znear;
-	__shared__ float zfar;
-	__shared__ float ZPlanes;
-	__shared__ int half_window;
-	__shared__ float K[9];
-	__shared__ float R[9];
-	__shared__ float t[3];
-	__shared__ float inv_K[9];
-	__shared__ float inv_R[9];
-	__shared__ float inv_t[3];*/
 	__shared__ int cam_x_proj[4];
 	__shared__ int cam_y_proj[4];
 	__shared__ float* sub_y_cam;
 	__shared__ int shared_width;
 	__shared__ int shared_height;
-
-	/*if (threadIdx.x == 0) {
-		if (threadIdx.y == 0) width = *const_width;
-		if (threadIdx.y == 1) height = *const_height;
-		if (threadIdx.y == 2) zi = *const_zi;
-		if (threadIdx.y == 3) znear = *const_znear;
-		if (threadIdx.y == 4) zfar = *const_zfar;
-		if (threadIdx.y == 5) ZPlanes = *const_ZPlanes;
-		if (threadIdx.y == 6) half_window = *const_half_window;
-	}
-	else if (threadIdx.x == 1 && threadIdx.y < 9) K[threadIdx.y] = const_K[threadIdx.y];
-	else if (threadIdx.x == 2 && threadIdx.y < 9) R[threadIdx.y] = const_R[threadIdx.y];
-	else if (threadIdx.x == 3 && threadIdx.y < 3) t[threadIdx.y] = const_t[threadIdx.y];
-	else if (threadIdx.x == 4 && threadIdx.y < 9) inv_K[threadIdx.y] = const_inv_K[threadIdx.y];
-	else if (threadIdx.x == 5 && threadIdx.y < 9) inv_R[threadIdx.y] = const_inv_R[threadIdx.y];
-	else if (threadIdx.x == 6 && threadIdx.y < 3) inv_t[threadIdx.y] = const_inv_t[threadIdx.y];
-
-	__syncthreads();*/
 
 	if (x >= *const_width || y >= *const_height)
 		return;
@@ -748,10 +692,7 @@ __global__ void compute_cost_shared_full_float_2D(float* cost_cube, const float*
 	// Projected camera 3D coordinates to projected camera 2D coordinates
 	float x_proj = (const_K[0] * X_proj / Z_proj + const_K[1] * Y_proj / Z_proj + const_K[2]);
 	float y_proj = (const_K[3] * X_proj / Z_proj + const_K[4] * Y_proj / Z_proj + const_K[5]);
-	//float z_proj = Z_proj;
 
-	/*int x_proj2 = x_proj < 0 ? 0 : (x_proj >= *const_width ? *const_width : (int)roundf(x_proj));
-	int y_proj2 = y_proj < 0 ? 0 : (y_proj >= *const_height ? *const_height : (int)roundf(y_proj));*/
 
 	int x_proj2 = x_proj < 0 || x_proj >= *const_width ? 0 : (int)roundf(x_proj);
 	int y_proj2 = y_proj < 0 || y_proj >= *const_height ? 0 : (int)roundf(y_proj);
@@ -889,8 +830,6 @@ __global__ void compute_cost_shared_full_float_2D(float* cost_cube, const float*
 				cost += fabsf(float_sub_y_ref[MI(padding_x + l, padding_y + k, padding_length)] - y_cam[MI(x_proj2 + l, y_proj2 + k, *const_width)]);
 			}
 
-			//cost += fabsf(float_sub_y_ref[MI(padding_x + l, padding_y + k, padding_length)] - y_cam[MI(x_proj2 + l, y_proj2 + k, *const_width)]);
-
 			// U
 			// cost += fabs(ref.YUV[1].at<uint8_t >(y + k, x + l) - cam.YUV[1].at<uint8_t>((int)y_proj + k, (int)x_proj + l));
 			// V
@@ -904,7 +843,6 @@ __global__ void compute_cost_shared_full_float_2D(float* cost_cube, const float*
 	//  (iii) store minimum cost (arranged as cost images, e.g., first image = cost of every pixel for the first candidate)
 	// only the minimum cost for all the cameras is stored
 	if (cost_cube[MI(x, y, *const_width)] > cost) cost_cube[MI(x, y, *const_width)] = cost;
-	//cost_cube[MI(x, y, width)] = fminf(cost_cube[MI(x, y, width)], cost);
 	
 }
 
@@ -917,7 +855,7 @@ __global__ void compute_cost_smart_naive_full_float_2D(float* cost_cube, const f
 		return;
 
 	float z, X_ref, Y_ref, Z_ref, X, Y, Z, X_proj, Y_proj, Z_proj, x_proj, y_proj, x_proj2, y_proj2, cost, cc, k, l;
-	int min_cam_x, min_cam_y, sub_y_cam_width, sub_y_cam_height, shared_memory_flag, p, cam_x, cam_y;
+	int sub_y_cam_height;
 
 	for (int zi = 0; zi < 256; zi++) {
 
@@ -942,10 +880,6 @@ __global__ void compute_cost_smart_naive_full_float_2D(float* cost_cube, const f
 		// Projected camera 3D coordinates to projected camera 2D coordinates
 		x_proj = (const_K[0] * X_proj / Z_proj + const_K[1] * Y_proj / Z_proj + const_K[2]);
 		y_proj = (const_K[3] * X_proj / Z_proj + const_K[4] * Y_proj / Z_proj + const_K[5]);
-		//float z_proj = Z_proj;
-
-		/*x_proj2 = x_proj < 0 ? 0 : (x_proj >= *const_width ? *const_width : roundf(x_proj));
-		y_proj2 = y_proj < 0 ? 0 : (y_proj >= *const_height ? *const_height : roundf(y_proj));*/
 
 		x_proj2 = x_proj < 0 || x_proj >= *const_width ? 0 : roundf(x_proj);
 		y_proj2 = y_proj < 0 || y_proj >= *const_height ? 0 : roundf(y_proj);
@@ -1172,12 +1106,6 @@ __global__ void compute_cost_smart_shared_full_float_2D(float* cost_cube, const 
 		}
 		cost /= cc;
 
-		//if (shared_memory_flag == 1 && (int)float_sub_y_ref[MI(padding_x, padding_y, padding_length)] == zi) cost = 0.0;
-		//if (shared_memory_flag == 1 && 255 == zi) cost = -10.0;
-		//if (shared_memory_flag == 0 && 255 == zi) cost = -10.0;
-		//if (shared_memory_flag == 1 && blockIdx.y == 33 && 255 == zi) cost = -10.0;
-		//if (shared_memory_flag == 0 && 8*threadIdx.x == zi) cost = -10.0;
-
 		//  (iii) store minimum cost (arranged as cost images, e.g., first image = cost of every pixel for the first candidate)
 		// only the minimum cost for all the cameras is stored
 		if (cost_cube[MI3(x, y, zi, *const_width, *const_height)] > cost) cost_cube[MI3(x, y, zi, *const_width, *const_height)] = cost;
@@ -1186,13 +1114,11 @@ __global__ void compute_cost_smart_shared_full_float_2D(float* cost_cube, const 
 
 __global__ void compute_cost_smart_full_shared_full_float_2D(float* cost_cube, const float* y_ref, const float* y_cam)
 {
-	//if (threadIdx.x == 0 && threadIdx.y == 0) printf("I am initial block %d, %d\n", blockIdx.x, blockIdx.y);
 	int x = blockIdx.x * blockDim.x + threadIdx.x;
 	int y = blockIdx.y * blockDim.y + threadIdx.y;
 
 	__shared__ int width;
 	__shared__ int height;
-	//__shared__ float zi;
 	__shared__ float znear;
 	__shared__ float zfar;
 	__shared__ float ZPlanes;
@@ -1214,7 +1140,6 @@ __global__ void compute_cost_smart_full_shared_full_float_2D(float* cost_cube, c
 	if (threadIdx.x == 0) {
 		if (threadIdx.y == 0) width = *const_width;
 		if (threadIdx.y == 1) height = *const_height;
-		//if (threadIdx.y == 2) zi = *const_zi;
 		if (threadIdx.y == 3) znear = *const_znear;
 		if (threadIdx.y == 4) zfar = *const_zfar;
 		if (threadIdx.y == 5) ZPlanes = *const_ZPlanes;
@@ -1309,10 +1234,6 @@ __global__ void compute_cost_smart_full_shared_full_float_2D(float* cost_cube, c
 		// Projected camera 3D coordinates to projected camera 2D coordinates
 		float x_proj = (K[0] * X_proj / Z_proj + K[1] * Y_proj / Z_proj + K[2]);
 		float y_proj = (K[3] * X_proj / Z_proj + K[4] * Y_proj / Z_proj + K[5]);
-		//float z_proj = Z_proj;
-
-		/*int x_proj2 = x_proj < 0 ? 0 : (x_proj >= width ? width : (int)roundf(x_proj));
-		int y_proj2 = y_proj < 0 ? 0 : (y_proj >= height ? height : (int)roundf(y_proj));*/
 
 		int x_proj2 = x_proj < 0 || x_proj >= width ? 0 : (int)roundf(x_proj);
 		int y_proj2 = y_proj < 0 || y_proj >= height ? 0 : (int)roundf(y_proj);
@@ -1400,8 +1321,6 @@ __global__ void compute_cost_smart_full_shared_full_float_2D(float* cost_cube, c
 		}
 		cost /= cc;
 
-		//if (threadIdx.x == 0 && threadIdx.y == 0 && blockIdx.x == 0 && blockIdx.y == 0) printf("Layer %d: score = %f - x_proj : %d - cam = %f\n", zi, cost, x_proj2, y_cam[MI(x_proj2, y_proj2, width)]);
-
 		//  (iii) store minimum cost (arranged as cost images, e.g., first image = cost of every pixel for the first candidate)
 		// only the minimum cost for all the cameras is stored
 		if (cost_cube[MI3(x, y, zi, width, height)] > cost) cost_cube[MI3(x, y, zi, width, height)] = cost;
@@ -1410,13 +1329,11 @@ __global__ void compute_cost_smart_full_shared_full_float_2D(float* cost_cube, c
 
 __global__ void compute_all_cost_smart_full_shared_full_float_2D(float* cost_cube, const float* y_ref, const float* y_cam)
 {
-	//if (threadIdx.x == 0 && threadIdx.y == 0) printf("I am initial block %d, %d\n", blockIdx.x, blockIdx.y);
 	int x = blockIdx.x * blockDim.x + threadIdx.x;
 	int y = blockIdx.y * blockDim.y + threadIdx.y;
 
 	__shared__ int width;
 	__shared__ int height;
-	//__shared__ float zi;
 	__shared__ float znear;
 	__shared__ float zfar;
 	__shared__ float ZPlanes;
@@ -1441,7 +1358,6 @@ __global__ void compute_all_cost_smart_full_shared_full_float_2D(float* cost_cub
 	if (threadIdx.x == 0) {
 		if (threadIdx.y == 0) width = *const_width;
 		if (threadIdx.y == 1) height = *const_height;
-		//if (threadIdx.y == 2) zi = *const_zi;
 		if (threadIdx.y == 3) znear = *const_znear;
 		if (threadIdx.y == 4) zfar = *const_zfar;
 		if (threadIdx.y == 5) ZPlanes = *const_ZPlanes;
@@ -1456,7 +1372,6 @@ __global__ void compute_all_cost_smart_full_shared_full_float_2D(float* cost_cub
 
 
 	for(int cam_n = 0; cam_n < *const_cam_count; cam_n++){
-	//for (int cam_n = 1; cam_n < 2; cam_n++) {
 
 		if(cam_n != 0){
 			if (threadIdx.x == 1 && threadIdx.y < 9) K[threadIdx.y] = const_K[MI(threadIdx.y, cam_n, 9)];
@@ -1465,9 +1380,6 @@ __global__ void compute_all_cost_smart_full_shared_full_float_2D(float* cost_cub
 
 			__syncthreads();
 		}
-
-		/*if (x >= width || y >= height)
-			return;*/
 
 		int padding_length = N_THREADS + 2 * half_window;
 		int padding_x = half_window + threadIdx.x;
@@ -1546,10 +1458,6 @@ __global__ void compute_all_cost_smart_full_shared_full_float_2D(float* cost_cub
 			// Projected camera 3D coordinates to projected camera 2D coordinates
 			float x_proj = (K[0] * X_proj / Z_proj + K[1] * Y_proj / Z_proj + K[2]);
 			float y_proj = (K[3] * X_proj / Z_proj + K[4] * Y_proj / Z_proj + K[5]);
-			//float z_proj = Z_proj;
-
-			/*int x_proj2 = x_proj < 0 ? 0 : (x_proj >= width ? width : (int)roundf(x_proj));
-			int y_proj2 = y_proj < 0 ? 0 : (y_proj >= height ? height : (int)roundf(y_proj));*/
 
 			int x_proj2 = x_proj < 0 || x_proj >= width ? 0 : (int)roundf(x_proj);
 			int y_proj2 = y_proj < 0 || y_proj >= height ? 0 : (int)roundf(y_proj);
@@ -1637,11 +1545,6 @@ __global__ void compute_all_cost_smart_full_shared_full_float_2D(float* cost_cub
 			}
 			cost /= cc;
 
-			//if (shared_memory_flag == 1 && (int)float_sub_y_ref[MI(padding_x, padding_y, padding_length)] == zi) cost = -10.0;
-			//if ((int)y_cam[MI3(x, y, cam_n, width, height)] == zi) cost = -10.0;
-			//if (threadIdx.x == 0 && threadIdx.y == 0 && blockIdx.x == 0 && blockIdx.y == 0) printf("Layer %d: score = %f - x_proj : %d - cam = %f\n", zi, cost, x_proj2, y_cam[MI(x_proj2, y_proj2, width)]);
-			//if (threadIdx.x == 0 && threadIdx.y==0 && blockIdx.x == 10 && blockIdx.y == 10 && shared_memory_flag == 1) printf("Layer %d of camera %d: value in shared mem = %f\n", zi, cam_n, sub_y_cam[0]);
-
 			//  (iii) store minimum cost (arranged as cost images, e.g., first image = cost of every pixel for the first candidate)
 			// only the minimum cost for all the cameras is stored
 			if (cost_cube[MI3(x, y, zi, width, height)] > cost) cost_cube[MI3(x, y, zi, width, height)] = cost;
@@ -1653,15 +1556,11 @@ __global__ void compute_all_cost_smart_full_shared_full_float_2D(float* cost_cub
 
 __global__ void compute_all_cost_no_fill_smart_full_shared_full_float_2D(float* cost_cube, const float* y_ref, const float* y_cam)
 {
-	//if (threadIdx.x == 0 && threadIdx.y == 0) printf("I am initial block %d, %d\n", blockIdx.x, blockIdx.y);
 	int x = blockIdx.x * blockDim.x + threadIdx.x;
 	int y = blockIdx.y * blockDim.y + threadIdx.y;
 
-	float local_cost_cube = 255.0;
-
 	__shared__ int width;
 	__shared__ int height;
-	//__shared__ float zi;
 	__shared__ float znear;
 	__shared__ float zfar;
 	__shared__ float ZPlanes;
@@ -1686,7 +1585,6 @@ __global__ void compute_all_cost_no_fill_smart_full_shared_full_float_2D(float* 
 	if (threadIdx.x == 0) {
 		if (threadIdx.y == 0) width = *const_width;
 		if (threadIdx.y == 1) height = *const_height;
-		//if (threadIdx.y == 2) zi = *const_zi;
 		if (threadIdx.y == 3) znear = *const_znear;
 		if (threadIdx.y == 4) zfar = *const_zfar;
 		if (threadIdx.y == 5) ZPlanes = *const_ZPlanes;
@@ -1709,9 +1607,6 @@ __global__ void compute_all_cost_no_fill_smart_full_shared_full_float_2D(float* 
 		}
 
 		__syncthreads();
-
-		/*if (x >= width || y >= height)
-			return;*/
 
 		int padding_length = N_THREADS + 2 * half_window;
 		int padding_x = half_window + threadIdx.x;
@@ -1790,10 +1685,6 @@ __global__ void compute_all_cost_no_fill_smart_full_shared_full_float_2D(float* 
 			// Projected camera 3D coordinates to projected camera 2D coordinates
 			float x_proj = (K[0] * X_proj / Z_proj + K[1] * Y_proj / Z_proj + K[2]);
 			float y_proj = (K[3] * X_proj / Z_proj + K[4] * Y_proj / Z_proj + K[5]);
-			//float z_proj = Z_proj;
-
-			/*int x_proj2 = x_proj < 0 ? 0 : (x_proj >= width ? width : (int)roundf(x_proj));
-			int y_proj2 = y_proj < 0 ? 0 : (y_proj >= height ? height : (int)roundf(y_proj));*/
 
 			int x_proj2 = x_proj < 0 || x_proj >= width ? 0 : (int)roundf(x_proj);
 			int y_proj2 = y_proj < 0 || y_proj >= height ? 0 : (int)roundf(y_proj);
@@ -1880,10 +1771,6 @@ __global__ void compute_all_cost_no_fill_smart_full_shared_full_float_2D(float* 
 				}
 			}
 			cost /= cc;
-
-			//if (shared_memory_flag == 1 && (int)float_sub_y_ref[MI(padding_x, padding_y, padding_length)] == zi) cost = 0.0;
-			//if (threadIdx.x == 0 && threadIdx.y == 0 && blockIdx.x == 0 && blockIdx.y == 0) printf("Layer %d: score = %f - x_proj : %d - cam = %f\n", zi, cost, x_proj2, y_cam[MI(x_proj2, y_proj2, width)]);
-			//if (threadIdx.x == 0 && threadIdx.y==0 && blockIdx.x == 10 && blockIdx.y == 10 && shared_memory_flag == 1) printf("Layer %d of camera %d: value in shared mem = %f\n", zi, cam_n, sub_y_cam[0]);
 
 			//  (iii) store minimum cost (arranged as cost images, e.g., first image = cost of every pixel for the first candidate)
 			// only the minimum cost for all the cameras is stored
@@ -1898,15 +1785,11 @@ __global__ void compute_all_cost_no_fill_smart_full_shared_full_float_2D(float* 
 
 __global__ void compute_all_cost_no_fill_better_pad_smart_full_shared_full_float_2D(float* cost_cube, const float* y_ref, const float* y_cam)
 {
-	//if (threadIdx.x == 0 && threadIdx.y == 0) printf("I am initial block %d, %d\n", blockIdx.x, blockIdx.y);
 	int x = blockIdx.x * blockDim.x + threadIdx.x;
 	int y = blockIdx.y * blockDim.y + threadIdx.y;
 
-	float local_cost_cube = 255.0;
-
 	__shared__ int width;
 	__shared__ int height;
-	//__shared__ float zi;
 	__shared__ float znear;
 	__shared__ float zfar;
 	__shared__ float ZPlanes;
@@ -1931,7 +1814,6 @@ __global__ void compute_all_cost_no_fill_better_pad_smart_full_shared_full_float
 	if (threadIdx.x == 0) {
 		if (threadIdx.y == 0) width = *const_width;
 		if (threadIdx.y == 1) height = *const_height;
-		//if (threadIdx.y == 2) zi = *const_zi;
 		if (threadIdx.y == 3) znear = *const_znear;
 		if (threadIdx.y == 4) zfar = *const_zfar;
 		if (threadIdx.y == 5) ZPlanes = *const_ZPlanes;
@@ -1954,9 +1836,6 @@ __global__ void compute_all_cost_no_fill_better_pad_smart_full_shared_full_float
 		}
 
 		__syncthreads();
-
-		/*if (x >= width || y >= height)
-			return;*/
 
 		int padding_length = N_THREADS + 2 * half_window;
 		int padding_x = half_window + threadIdx.x;
@@ -2013,10 +1892,6 @@ __global__ void compute_all_cost_no_fill_better_pad_smart_full_shared_full_float
 			// Projected camera 3D coordinates to projected camera 2D coordinates
 			float x_proj = (K[0] * X_proj / Z_proj + K[1] * Y_proj / Z_proj + K[2]);
 			float y_proj = (K[3] * X_proj / Z_proj + K[4] * Y_proj / Z_proj + K[5]);
-			//float z_proj = Z_proj;
-
-			/*int x_proj2 = x_proj < 0 ? 0 : (x_proj >= width ? width : (int)roundf(x_proj));
-			int y_proj2 = y_proj < 0 ? 0 : (y_proj >= height ? height : (int)roundf(y_proj));*/
 
 			int x_proj2 = x_proj < 0 || x_proj >= width ? 0 : (int)roundf(x_proj);
 			int y_proj2 = y_proj < 0 || y_proj >= height ? 0 : (int)roundf(y_proj);
@@ -2103,10 +1978,6 @@ __global__ void compute_all_cost_no_fill_better_pad_smart_full_shared_full_float
 				}
 			}
 			cost /= cc;
-
-			//if (shared_memory_flag == 1 && (int)float_sub_y_ref[MI(padding_x, padding_y, padding_length)] == zi) cost = 0.0;
-			//if (threadIdx.x == 0 && threadIdx.y == 0 && blockIdx.x == 0 && blockIdx.y == 0) printf("Layer %d: score = %f - x_proj : %d - cam = %f\n", zi, cost, x_proj2, y_cam[MI(x_proj2, y_proj2, width)]);
-			//if (threadIdx.x == 0 && threadIdx.y==0 && blockIdx.x == 10 && blockIdx.y == 10 && shared_memory_flag == 1) printf("Layer %d of camera %d: value in shared mem = %f\n", zi, cam_n, sub_y_cam[0]);
 
 			//  (iii) store minimum cost (arranged as cost images, e.g., first image = cost of every pixel for the first candidate)
 			// only the minimum cost for all the cameras is stored
@@ -2228,10 +2099,6 @@ __global__ void compute_reduced_float_all_cost_no_fill_better_pad_smart_full_sha
 			// Projected camera 3D coordinates to projected camera 2D coordinates
 			float x_proj = (K[0] * X_proj / Z_proj + K[1] * Y_proj / Z_proj + K[2]);
 			float y_proj = (K[3] * X_proj / Z_proj + K[4] * Y_proj / Z_proj + K[5]);
-			//float z_proj = Z_proj;
-
-			/*int x_proj2 = x_proj < 0 ? 0 : (x_proj >= width ? width : (int)roundf(x_proj));
-			int y_proj2 = y_proj < 0 ? 0 : (y_proj >= height ? height : (int)roundf(y_proj));*/
 
 			int x_proj2 = x_proj < 0 || x_proj >= width ? 0 : (int)roundf(x_proj);
 			int y_proj2 = y_proj < 0 || y_proj >= height ? 0 : (int)roundf(y_proj);
@@ -2453,10 +2320,6 @@ __global__ void compute_reduced_uint8_t_all_cost_no_fill_better_pad_smart_full_s
 			// Projected camera 3D coordinates to projected camera 2D coordinates
 			float x_proj = (K[0] * X_proj / Z_proj + K[1] * Y_proj / Z_proj + K[2]);
 			float y_proj = (K[3] * X_proj / Z_proj + K[4] * Y_proj / Z_proj + K[5]);
-			//float z_proj = Z_proj;
-
-			/*int x_proj2 = x_proj < 0 ? 0 : (x_proj >= width ? width : (int)roundf(x_proj));
-			int y_proj2 = y_proj < 0 ? 0 : (y_proj >= height ? height : (int)roundf(y_proj));*/
 
 			int x_proj2 = x_proj < 0 || x_proj >= width ? 0 : (int)roundf(x_proj);
 			int y_proj2 = y_proj < 0 || y_proj >= height ? 0 : (int)roundf(y_proj);
@@ -2681,10 +2544,6 @@ __global__ void compute_reduced_uint8_t_all_cost_no_fill_better_pad_less_global_
 			// Projected camera 3D coordinates to projected camera 2D coordinates
 			float x_proj = (K[0] * X_proj / Z_proj + K[1] * Y_proj / Z_proj + K[2]);
 			float y_proj = (K[3] * X_proj / Z_proj + K[4] * Y_proj / Z_proj + K[5]);
-			//float z_proj = Z_proj;
-
-			/*int x_proj2 = x_proj < 0 ? 0 : (x_proj >= width ? width : (int)roundf(x_proj));
-			int y_proj2 = y_proj < 0 ? 0 : (y_proj >= height ? height : (int)roundf(y_proj));*/
 
 			int x_proj2 = x_proj < 0 || x_proj >= width ? 0 : (int)roundf(x_proj);
 			int y_proj2 = y_proj < 0 || y_proj >= height ? 0 : (int)roundf(y_proj);
@@ -2801,20 +2660,6 @@ __global__ void compute_reduced_uint8_t_all_cost_no_fill_better_pad_less_global_
 
 
 
-void test(cv::Mat const& Y) {
-	cv::Mat* dev_Y;
-	uchar* Y_arr = Y.isContinuous()? Y.data: Y.clone().data;
-	
-	cudaSetDevice(0);
-	cudaMalloc((void**)&dev_Y, sizeof(int));
-	cudaMemcpy(&dev_Y, Y_arr, 1920*1080*sizeof(float), cudaMemcpyHostToDevice);
-
-
-	cv::namedWindow("Y", cv::WindowFlags::WINDOW_AUTOSIZE);
-	cv::imshow("Y", Y);
-	cv::waitKey(0);
-}
-
 float* frame2frame_matching_naive_baseline(cam &ref, cam &cam_1, cv::Mat &cost_cube_plane, int zi, int half_window)
 {
 
@@ -2895,7 +2740,6 @@ float* frame2frame_matching_naive_baseline(cam &ref, cam &cam_1, cv::Mat &cost_c
 	//CHK(cudaGetLastError());
 	cudaGetLastError();
 	
-	//CHK(cudaMemcpy(cost_cube_plane.data, dev_cost_cube, mat_length * sizeof(float), cudaMemcpyDeviceToHost));
 	CHK(cudaMemcpy(new_cost_cube, dev_cost_cube, mat_length * sizeof(float), cudaMemcpyDeviceToHost));
 
 	free(y_ref);
@@ -3017,7 +2861,6 @@ float* frame2frame_matching_naive_float(cam& ref, cam& cam_1, cv::Mat& cost_cube
 	compute_cost_naive_float << <block_size, thread_size >> > (dev_width, dev_height, dev_zi, dev_znear, dev_zfar, dev_zplanes, dev_half_window, dev_K,
 		dev_R, dev_t, dev_inv_K, dev_inv_R, dev_inv_t, dev_cost_cube, dev_Y_ref, dev_Y_cam);
 
-	//CHK(cudaGetLastError());
 	cudaGetLastError();
 
 	CHK(cudaMemcpy(new_cost_cube, dev_cost_cube, mat_length * sizeof(float), cudaMemcpyDeviceToHost));
@@ -3143,7 +2986,6 @@ float* frame2frame_matching_naive_float_2D(cam& ref, cam& cam_1, cv::Mat& cost_c
 	compute_cost_naive_float_2D << <block_size, thread_size >> > (dev_width, dev_height, dev_zi, dev_znear, dev_zfar, dev_zplanes, dev_half_window, dev_K,
 		dev_R, dev_t, dev_inv_K, dev_inv_R, dev_inv_t, dev_cost_cube, dev_Y_ref, dev_Y_cam);
 
-	//CHK(cudaGetLastError());
 	cudaGetLastError();
 
 	CHK(cudaMemcpy(new_cost_cube, dev_cost_cube, mat_length * sizeof(float), cudaMemcpyDeviceToHost));
@@ -3268,7 +3110,6 @@ float* frame2frame_matching_partially_shared_float_2D(cam& ref, cam& cam_1, cv::
 	compute_cost_partially_shared_float_2D <<<block_size, thread_size, shared_memory_size * shared_memory_size * sizeof(uint8_t)>>> (dev_width, dev_height, dev_zi,
 	dev_znear, dev_zfar, dev_zplanes, dev_half_window, dev_K, dev_R, dev_t, dev_inv_K, dev_inv_R, dev_inv_t, dev_cost_cube, dev_Y_ref, dev_Y_cam);
 
-	//CHK(cudaGetLastError());
 	cudaGetLastError();
 
 	CHK(cudaMemcpy(new_cost_cube, dev_cost_cube, mat_length * sizeof(float), cudaMemcpyDeviceToHost));
@@ -3825,7 +3666,6 @@ float* frame2frame_matching_all_smart_full_shared_full_float_2D(cam& ref, std::v
 	mat_length = ref.height * ref.width;
 	uint im_length = mat_length * 3 / 2;
 	const uint cam_count = cam_vector.size() - 1;
-	//printf("Going through %d cameras each of length %d\n", cam_count, im_length);
 
 	float* new_cost_cube = new float[mat_length * ZPlanes];
 	for (int i = 0; i < ZPlanes; i++)
@@ -3910,7 +3750,6 @@ float* frame2frame_matching_all_smart_full_shared_full_float_2D(cam& ref, std::v
 	cudaGetLastError();
 
 	CHK(cudaMemcpy(new_cost_cube, dev_cost_cube, mat_length * ZPlanes * sizeof(float), cudaMemcpyDeviceToHost));
-	//CHK(cudaMemcpy(new_cost_cube, dev_cost_cube, sizeof(float), cudaMemcpyDeviceToHost));
 
 	free(y_ref);
 	free(y_cams);
@@ -3927,7 +3766,6 @@ float* frame2frame_matching_all_smart_full_shared_full_float_2D(cam& ref, std::v
 	CHK(cudaDeviceReset());
 
 	return result;
-	//return new_cost_cube;
 }
 
 float* frame2frame_matching_all_no_fill_smart_full_shared_full_float_2D(cam& ref, std::vector<cam>& cam_vector, std::vector<cv::Mat>& cost_cube, int half_window)
@@ -3939,7 +3777,6 @@ float* frame2frame_matching_all_no_fill_smart_full_shared_full_float_2D(cam& ref
 	mat_length = ref.height * ref.width;
 	uint im_length = mat_length * 3 / 2;
 	const uint cam_count = cam_vector.size() - 1;
-	//printf("Going through %d cameras each of length %d\n", cam_count, im_length);
 
 	float* new_cost_cube = new float[mat_length * ZPlanes];
 
@@ -4016,7 +3853,6 @@ float* frame2frame_matching_all_no_fill_smart_full_shared_full_float_2D(cam& ref
 	cudaGetLastError();
 
 	CHK(cudaMemcpy(new_cost_cube, dev_cost_cube, mat_length * ZPlanes * sizeof(float), cudaMemcpyDeviceToHost));
-	//CHK(cudaMemcpy(new_cost_cube, dev_cost_cube, sizeof(float), cudaMemcpyDeviceToHost));
 
 	free(y_ref);
 	free(y_cams);
@@ -4033,7 +3869,6 @@ float* frame2frame_matching_all_no_fill_smart_full_shared_full_float_2D(cam& ref
 	CHK(cudaDeviceReset());
 
 	return result;
-	//return new_cost_cube;
 }
 
 float* frame2frame_matching_all_no_fill_better_pad_smart_full_shared_full_float_2D(cam& ref, std::vector<cam>& cam_vector, std::vector<cv::Mat>& cost_cube, int half_window)
@@ -4045,7 +3880,6 @@ float* frame2frame_matching_all_no_fill_better_pad_smart_full_shared_full_float_
 	mat_length = ref.height * ref.width;
 	uint im_length = mat_length * 3 / 2;
 	const uint cam_count = cam_vector.size() - 1;
-	//printf("Going through %d cameras each of length %d\n", cam_count, im_length);
 
 	float* new_cost_cube = new float[mat_length * ZPlanes];
 
@@ -4122,7 +3956,6 @@ float* frame2frame_matching_all_no_fill_better_pad_smart_full_shared_full_float_
 	cudaGetLastError();
 
 	CHK(cudaMemcpy(new_cost_cube, dev_cost_cube, mat_length * ZPlanes * sizeof(float), cudaMemcpyDeviceToHost));
-	//CHK(cudaMemcpy(new_cost_cube, dev_cost_cube, sizeof(float), cudaMemcpyDeviceToHost));
 
 	free(y_ref);
 	free(y_cams);
@@ -4139,7 +3972,6 @@ float* frame2frame_matching_all_no_fill_better_pad_smart_full_shared_full_float_
 	CHK(cudaDeviceReset());
 
 	return result;
-	//return new_cost_cube;
 }
 
 float* frame2frame_matching_reduced_float_all_no_fill_better_pad_smart_full_shared_full_float_2D(cam& ref, std::vector<cam>& cam_vector, int half_window)
@@ -4227,7 +4059,6 @@ float* frame2frame_matching_reduced_float_all_no_fill_better_pad_smart_full_shar
 	cudaGetLastError();
 
 	CHK(cudaMemcpy(new_cost_cube, dev_cost_cube, mat_length * 2 * sizeof(float), cudaMemcpyDeviceToHost));
-	//CHK(cudaMemcpy(new_cost_cube, dev_cost_cube, sizeof(float), cudaMemcpyDeviceToHost));
 
 	free(y_ref);
 	free(y_cams);
@@ -4244,7 +4075,6 @@ float* frame2frame_matching_reduced_float_all_no_fill_better_pad_smart_full_shar
 	CHK(cudaDeviceReset());
 
 	return result;
-	//return new_cost_cube;
 }
 
 uint8_t* frame2frame_matching_reduced_uint8_t_all_no_fill_better_pad_smart_full_shared_full_float_2D(cam& ref, std::vector<cam>& cam_vector, int half_window)
@@ -4334,7 +4164,6 @@ uint8_t* frame2frame_matching_reduced_uint8_t_all_no_fill_better_pad_smart_full_
 	cudaGetLastError();
 
 	CHK(cudaMemcpy(depth, dev_depth, mat_length * sizeof(uint8_t), cudaMemcpyDeviceToHost));
-	//CHK(cudaMemcpy(new_cost_cube, dev_cost_cube, sizeof(float), cudaMemcpyDeviceToHost));
 
 	free(y_ref);
 	free(y_cams);
@@ -4352,7 +4181,6 @@ uint8_t* frame2frame_matching_reduced_uint8_t_all_no_fill_better_pad_smart_full_
 	CHK(cudaDeviceReset());
 
 	return result;
-	//return new_cost_cube;
 }
 
 uint8_t* frame2frame_matching_reduced_uint8_t_all_no_fill_better_pad_less_global_smart_full_shared_full_float_2D(cam& ref, std::vector<cam>& cam_vector, int half_window)
@@ -4460,5 +4288,4 @@ uint8_t* frame2frame_matching_reduced_uint8_t_all_no_fill_better_pad_less_global
 	CHK(cudaDeviceReset());
 
 	return result;
-	//return new_cost_cube;
 }
