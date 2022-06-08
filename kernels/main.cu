@@ -300,6 +300,7 @@ __global__ void compute_cost_partially_shared_float_2D(int* global_width, int* g
 	__shared__ float inv_R[9];
 	__shared__ float inv_t[3];
 
+	//Fill shared memory
 	if (threadIdx.x == 0) {
 		if (threadIdx.y == 0) width = *global_width;
 		if (threadIdx.y == 1) height = *global_height;
@@ -318,6 +319,7 @@ __global__ void compute_cost_partially_shared_float_2D(int* global_width, int* g
 
 	__syncthreads();
 
+	// Compute padding coordinates
 	int padding_length = N_THREADS + 2 * half_window;
 	int padding_x = half_window + threadIdx.x;
 	int padding_y = half_window + threadIdx.y;
@@ -463,6 +465,7 @@ __global__ void compute_cost_shared_float_2D(int* global_width, int* global_heig
 	__shared__ int shared_width;
 	__shared__ int shared_height;
 
+	//Fill shared memory
 	if (threadIdx.x == 0) {
 		if (threadIdx.y == 0) width = *global_width;
 		if (threadIdx.y == 1) height = *global_height;
@@ -505,14 +508,11 @@ __global__ void compute_cost_shared_float_2D(int* global_width, int* global_heig
 	// Projected camera 3D coordinates to projected camera 2D coordinates
 	float x_proj = (K[0] * X_proj / Z_proj + K[1] * Y_proj / Z_proj + K[2]);
 	float y_proj = (K[3] * X_proj / Z_proj + K[4] * Y_proj / Z_proj + K[5]);
-	//float z_proj = Z_proj;
-
-	/*int x_proj2 = x_proj < 0 ? 0 : (x_proj >= width ? width : (int)roundf(x_proj));
-	int y_proj2 = y_proj < 0 ? 0 : (y_proj >= height ? height : (int)roundf(y_proj));*/
 	
 	int x_proj2 = x_proj < 0 || x_proj >= width ? 0 : (int)roundf(x_proj);
 	int y_proj2 = y_proj < 0 || y_proj >= height ? 0 : (int)roundf(y_proj);
 
+	// Compute projection corners
 	if (threadIdx.x == 0) {
 		if (threadIdx.y == 0) {
 			cam_x_proj[0] = x_proj2;
@@ -536,6 +536,7 @@ __global__ void compute_cost_shared_float_2D(int* global_width, int* global_heig
 		}
 	}
 
+	// Compute padding coordinates
 	int padding_length = N_THREADS + 2 * half_window;
 	int padding_x = half_window + threadIdx.x;
 	int padding_y = half_window + threadIdx.y;
@@ -591,6 +592,7 @@ __global__ void compute_cost_shared_float_2D(int* global_width, int* global_heig
 	
 	__syncthreads();
 
+	// Compute projected padding parameters
 	int min_cam_x = umin(cam_x_proj[0], cam_x_proj[2]) - half_window;
 	int min_cam_y = umin(cam_y_proj[0], cam_y_proj[1]) - half_window;
 	int sub_y_cam_width = umax(cam_x_proj[1], cam_x_proj[3]) + half_window - min_cam_x + 1;
@@ -601,6 +603,7 @@ __global__ void compute_cost_shared_float_2D(int* global_width, int* global_heig
 		shared_memory_flag = 0;
 	}
 
+	// fill the projected padding
 	if (shared_memory_flag == 1) {
 		sub_y_cam = &sub_y_ref[padding_length * padding_length];
 		int p = threadIdx.x + threadIdx.y * shared_width;
@@ -697,6 +700,8 @@ __global__ void compute_cost_shared_full_float_2D(float* cost_cube, const float*
 	int x_proj2 = x_proj < 0 || x_proj >= *const_width ? 0 : (int)roundf(x_proj);
 	int y_proj2 = y_proj < 0 || y_proj >= *const_height ? 0 : (int)roundf(y_proj);
 
+
+	// Compute projection corners
 	if (threadIdx.x == 0) {
 		if (threadIdx.y == 0) {
 			cam_x_proj[0] = x_proj2;
@@ -775,6 +780,7 @@ __global__ void compute_cost_shared_full_float_2D(float* cost_cube, const float*
 
 	__syncthreads();
 
+	// Compute projected padding parameters
 	int min_cam_x = umin(cam_x_proj[0], cam_x_proj[2]) - *const_half_window;
 	int min_cam_y = umin(cam_y_proj[0], cam_y_proj[1]) - *const_half_window;
 	int sub_y_cam_width = umax(cam_x_proj[1], cam_x_proj[3]) + *const_half_window - min_cam_x + 1;
@@ -785,6 +791,7 @@ __global__ void compute_cost_shared_full_float_2D(float* cost_cube, const float*
 		shared_memory_flag = 0;
 	}
 
+	// fill the projected padding
 	if (shared_memory_flag == 1) {
 		sub_y_cam = &float_sub_y_ref[padding_length * padding_length];
 		int p = threadIdx.x + threadIdx.y * shared_width;
@@ -1047,6 +1054,7 @@ __global__ void compute_cost_smart_shared_full_float_2D(float* cost_cube, const 
 
 		__syncthreads();
 
+		// Compute projection corners
 		min_cam_x = umin(cam_x_proj[0], cam_x_proj[2]) - *const_half_window;
 		min_cam_y = umin(cam_y_proj[0], cam_y_proj[1]) - *const_half_window;
 		sub_y_cam_width = umax(cam_x_proj[1], cam_x_proj[3]) + *const_half_window - min_cam_x + 1;
@@ -1057,6 +1065,7 @@ __global__ void compute_cost_smart_shared_full_float_2D(float* cost_cube, const 
 			shared_memory_flag = 0;
 		}
 
+		// fill the projected padding
 		if (shared_memory_flag == 1) {
 			sub_y_cam = &float_sub_y_ref[padding_length * padding_length];
 			p = threadIdx.x + threadIdx.y * shared_width;
@@ -1137,6 +1146,7 @@ __global__ void compute_cost_smart_full_shared_full_float_2D(float* cost_cube, c
 
 	extern __shared__ float float_sub_y_ref[];
 
+	// Fill shared memory
 	if (threadIdx.x == 0) {
 		if (threadIdx.y == 0) width = *const_width;
 		if (threadIdx.y == 1) height = *const_height;
@@ -1238,6 +1248,8 @@ __global__ void compute_cost_smart_full_shared_full_float_2D(float* cost_cube, c
 		int x_proj2 = x_proj < 0 || x_proj >= width ? 0 : (int)roundf(x_proj);
 		int y_proj2 = y_proj < 0 || y_proj >= height ? 0 : (int)roundf(y_proj);
 
+
+		// Compute projection corners
 		if (threadIdx.x == 0) {
 			if (threadIdx.y == 0) {
 				cam_x_proj[0] = x_proj2;
@@ -1263,6 +1275,7 @@ __global__ void compute_cost_smart_full_shared_full_float_2D(float* cost_cube, c
 
 		__syncthreads();
 
+		// Compute projected padding parameters
 		int min_cam_x = umin(cam_x_proj[0], cam_x_proj[2]) - half_window;
 		int min_cam_y = umin(cam_y_proj[0], cam_y_proj[1]) - half_window;
 		int sub_y_cam_width = umax(cam_x_proj[1], cam_x_proj[3]) + half_window - min_cam_x + 1;
@@ -1273,6 +1286,7 @@ __global__ void compute_cost_smart_full_shared_full_float_2D(float* cost_cube, c
 			shared_memory_flag = 0;
 		}
 
+		// fill the projected padding
 		if (shared_memory_flag == 1) {
 			sub_y_cam = &float_sub_y_ref[padding_length * padding_length];
 			int p = threadIdx.x + threadIdx.y * shared_width;
@@ -1355,6 +1369,7 @@ __global__ void compute_all_cost_smart_full_shared_full_float_2D(float* cost_cub
 	if (x >= *const_width || y >= *const_height)
 		return;
 
+	//Fill shared memory
 	if (threadIdx.x == 0) {
 		if (threadIdx.y == 0) width = *const_width;
 		if (threadIdx.y == 1) height = *const_height;
@@ -1462,6 +1477,7 @@ __global__ void compute_all_cost_smart_full_shared_full_float_2D(float* cost_cub
 			int x_proj2 = x_proj < 0 || x_proj >= width ? 0 : (int)roundf(x_proj);
 			int y_proj2 = y_proj < 0 || y_proj >= height ? 0 : (int)roundf(y_proj);
 
+			// Compute projection corners
 			if (threadIdx.x == 0) {
 				if (threadIdx.y == 0) {
 					cam_x_proj[0] = x_proj2;
@@ -1487,6 +1503,7 @@ __global__ void compute_all_cost_smart_full_shared_full_float_2D(float* cost_cub
 
 			__syncthreads();
 
+			// Compute projection corners
 			int min_cam_x = umin(cam_x_proj[0], cam_x_proj[2]) - half_window;
 			int min_cam_y = umin(cam_y_proj[0], cam_y_proj[1]) - half_window;
 			int sub_y_cam_width = umax(cam_x_proj[1], cam_x_proj[3]) + half_window - min_cam_x + 1;
@@ -1497,6 +1514,7 @@ __global__ void compute_all_cost_smart_full_shared_full_float_2D(float* cost_cub
 				shared_memory_flag = 0;
 			}
 
+			// fill the projected padding
 			if (shared_memory_flag == 1) {
 				sub_y_cam = &float_sub_y_ref[padding_length * padding_length];
 				int p = threadIdx.x + threadIdx.y * shared_width;
@@ -1582,6 +1600,7 @@ __global__ void compute_all_cost_no_fill_smart_full_shared_full_float_2D(float* 
 	if (x >= *const_width || y >= *const_height)
 		return;
 
+	//Fill shared memory
 	if (threadIdx.x == 0) {
 		if (threadIdx.y == 0) width = *const_width;
 		if (threadIdx.y == 1) height = *const_height;
@@ -1689,6 +1708,7 @@ __global__ void compute_all_cost_no_fill_smart_full_shared_full_float_2D(float* 
 			int x_proj2 = x_proj < 0 || x_proj >= width ? 0 : (int)roundf(x_proj);
 			int y_proj2 = y_proj < 0 || y_proj >= height ? 0 : (int)roundf(y_proj);
 
+			// Compute projection corners
 			if (threadIdx.x == 0) {
 				if (threadIdx.y == 0) {
 					cam_x_proj[0] = x_proj2;
@@ -1714,6 +1734,7 @@ __global__ void compute_all_cost_no_fill_smart_full_shared_full_float_2D(float* 
 
 			__syncthreads();
 
+			// Compute projection corners
 			int min_cam_x = umin(cam_x_proj[0], cam_x_proj[2]) - half_window;
 			int min_cam_y = umin(cam_y_proj[0], cam_y_proj[1]) - half_window;
 			int sub_y_cam_width = umax(cam_x_proj[1], cam_x_proj[3]) + half_window - min_cam_x + 1;
@@ -1724,6 +1745,7 @@ __global__ void compute_all_cost_no_fill_smart_full_shared_full_float_2D(float* 
 				shared_memory_flag = 0;
 			}
 
+			// fill the projected padding
 			if (shared_memory_flag == 1) {
 				sub_y_cam = &float_sub_y_ref[padding_length * padding_length];
 				int p = threadIdx.x + threadIdx.y * shared_width;
@@ -1757,7 +1779,6 @@ __global__ void compute_all_cost_no_fill_smart_full_shared_full_float_2D(float* 
 						continue;
 					if (y_proj2 + k < 0 || y_proj2 + k >= height)
 						continue;
-
 
 					if (shared_memory_flag == 1) {
 						if (x_proj2 - min_cam_x + l >= 0 && x_proj2 - min_cam_x + l < sub_y_cam_width && y_proj2 - min_cam_y + k >= 0 && y_proj2 - min_cam_y + k < sub_y_cam_height) {
@@ -1811,6 +1832,7 @@ __global__ void compute_all_cost_no_fill_better_pad_smart_full_shared_full_float
 	if (x >= *const_width || y >= *const_height)
 		return;
 
+	//Fill shared memory
 	if (threadIdx.x == 0) {
 		if (threadIdx.y == 0) width = *const_width;
 		if (threadIdx.y == 1) height = *const_height;
@@ -1844,6 +1866,7 @@ __global__ void compute_all_cost_no_fill_better_pad_smart_full_shared_full_float
 		int shared_ref_width;
 		int shared_ref_height;
 
+		// Compute ref padding parameters
 		if( (blockIdx.x + 1) * N_THREADS > width)
 			shared_ref_width = width - blockIdx.x * N_THREADS;
 		else 
@@ -1853,8 +1876,8 @@ __global__ void compute_all_cost_no_fill_better_pad_smart_full_shared_full_float
 		else
 			shared_ref_height = N_THREADS;
 
+		// Fill ref padding
 		int p = threadIdx.x + threadIdx.y * shared_ref_width;
-
 		while (p < padding_length * padding_length) {
 			int cam_x = MI(p % padding_length - half_window, blockIdx.x, N_THREADS);
 			int cam_y = MI(p / padding_length - half_window, blockIdx.y, N_THREADS);
@@ -1896,6 +1919,7 @@ __global__ void compute_all_cost_no_fill_better_pad_smart_full_shared_full_float
 			int x_proj2 = x_proj < 0 || x_proj >= width ? 0 : (int)roundf(x_proj);
 			int y_proj2 = y_proj < 0 || y_proj >= height ? 0 : (int)roundf(y_proj);
 
+			// Find projected padding corners
 			if (threadIdx.x == 0) {
 				if (threadIdx.y == 0) {
 					cam_x_proj[0] = x_proj2;
@@ -1921,6 +1945,7 @@ __global__ void compute_all_cost_no_fill_better_pad_smart_full_shared_full_float
 
 			__syncthreads();
 
+			// Compute projected padding parameters
 			int min_cam_x = umin(cam_x_proj[0], cam_x_proj[2]) - half_window;
 			int min_cam_y = umin(cam_y_proj[0], cam_y_proj[1]) - half_window;
 			int sub_y_cam_width = umax(cam_x_proj[1], cam_x_proj[3]) + half_window - min_cam_x + 1;
@@ -1931,6 +1956,7 @@ __global__ void compute_all_cost_no_fill_better_pad_smart_full_shared_full_float
 				shared_memory_flag = 0;
 			}
 
+			// fill the projected padding
 			if (shared_memory_flag == 1) {
 				sub_y_cam = &float_sub_y_ref[padding_length * padding_length];
 				int p = threadIdx.x + threadIdx.y * shared_width;
@@ -1964,7 +1990,6 @@ __global__ void compute_all_cost_no_fill_better_pad_smart_full_shared_full_float
 						continue;
 					if (y_proj2 + k < 0 || y_proj2 + k >= height)
 						continue;
-
 
 					if (shared_memory_flag == 1) {
 						if (x_proj2 - min_cam_x + l >= 0 && x_proj2 - min_cam_x + l < sub_y_cam_width && y_proj2 - min_cam_y + k >= 0 && y_proj2 - min_cam_y + k < sub_y_cam_height) {
@@ -2018,6 +2043,7 @@ __global__ void compute_reduced_float_all_cost_no_fill_better_pad_smart_full_sha
 	if (x >= *const_width || y >= *const_height)
 		return;
 
+	// Fill shared memory
 	if (threadIdx.x == 0) {
 		if (threadIdx.y == 0) width = *const_width;
 		if (threadIdx.y == 1) height = *const_height;
@@ -2044,6 +2070,7 @@ __global__ void compute_reduced_float_all_cost_no_fill_better_pad_smart_full_sha
 
 		__syncthreads();
 
+		// Compute ref padding parameters
 		int padding_length = N_THREADS + 2 * half_window;
 		int padding_x = half_window + threadIdx.x;
 		int padding_y = half_window + threadIdx.y;
@@ -2060,8 +2087,8 @@ __global__ void compute_reduced_float_all_cost_no_fill_better_pad_smart_full_sha
 		else
 			shared_ref_height = N_THREADS;
 
+		// Fill ref padding
 		int p = threadIdx.x + threadIdx.y * shared_ref_width;
-
 		while (p < padding_length * padding_length) {
 			int cam_x = MI(p % padding_length - half_window, blockIdx.x, N_THREADS);
 			int cam_y = MI(p / padding_length - half_window, blockIdx.y, N_THREADS);
@@ -2103,6 +2130,7 @@ __global__ void compute_reduced_float_all_cost_no_fill_better_pad_smart_full_sha
 			int x_proj2 = x_proj < 0 || x_proj >= width ? 0 : (int)roundf(x_proj);
 			int y_proj2 = y_proj < 0 || y_proj >= height ? 0 : (int)roundf(y_proj);
 
+			// Find projected padding corners
 			if (threadIdx.x == 0) {
 				if (threadIdx.y == 0) {
 					cam_x_proj[0] = x_proj2;
@@ -2128,6 +2156,7 @@ __global__ void compute_reduced_float_all_cost_no_fill_better_pad_smart_full_sha
 
 			__syncthreads();
 
+			// Compute projected padding parameters
 			int min_cam_x = umin(cam_x_proj[0], cam_x_proj[2]) - half_window;
 			int min_cam_y = umin(cam_y_proj[0], cam_y_proj[1]) - half_window;
 			int sub_y_cam_width = umax(cam_x_proj[1], cam_x_proj[3]) + half_window - min_cam_x + 1;
@@ -2138,6 +2167,7 @@ __global__ void compute_reduced_float_all_cost_no_fill_better_pad_smart_full_sha
 				shared_memory_flag = 0;
 			}
 
+			// fill the projected padding
 			if (shared_memory_flag == 1) {
 				sub_y_cam = &float_sub_y_ref[padding_length * padding_length];
 				int p = threadIdx.x + threadIdx.y * shared_width;
@@ -2239,6 +2269,7 @@ __global__ void compute_reduced_uint8_t_all_cost_no_fill_better_pad_smart_full_s
 	if (x >= *const_width || y >= *const_height)
 		return;
 
+	// Fill shared memory
 	if (threadIdx.x == 0) {
 		if (threadIdx.y == 0) width = *const_width;
 		if (threadIdx.y == 1) height = *const_height;
@@ -2265,6 +2296,7 @@ __global__ void compute_reduced_uint8_t_all_cost_no_fill_better_pad_smart_full_s
 
 		__syncthreads();
 
+		// Compute ref padding parameters
 		int padding_length = N_THREADS + 2 * half_window;
 		int padding_x = half_window + threadIdx.x;
 		int padding_y = half_window + threadIdx.y;
@@ -2281,6 +2313,7 @@ __global__ void compute_reduced_uint8_t_all_cost_no_fill_better_pad_smart_full_s
 		else
 			shared_ref_height = N_THREADS;
 
+		// Fill ref padding
 		int p = threadIdx.x + threadIdx.y * shared_ref_width;
 
 		while (p < padding_length * padding_length) {
@@ -2324,6 +2357,7 @@ __global__ void compute_reduced_uint8_t_all_cost_no_fill_better_pad_smart_full_s
 			int x_proj2 = x_proj < 0 || x_proj >= width ? 0 : (int)roundf(x_proj);
 			int y_proj2 = y_proj < 0 || y_proj >= height ? 0 : (int)roundf(y_proj);
 
+			// Find projected padding corners
 			if (threadIdx.x == 0) {
 				if (threadIdx.y == 0) {
 					cam_x_proj[0] = x_proj2;
@@ -2349,6 +2383,7 @@ __global__ void compute_reduced_uint8_t_all_cost_no_fill_better_pad_smart_full_s
 
 			__syncthreads();
 
+			// Compute projected padding parameters
 			int min_cam_x = umin(cam_x_proj[0], cam_x_proj[2]) - half_window;
 			int min_cam_y = umin(cam_y_proj[0], cam_y_proj[1]) - half_window;
 			int sub_y_cam_width = umax(cam_x_proj[1], cam_x_proj[3]) + half_window - min_cam_x + 1;
@@ -2359,6 +2394,7 @@ __global__ void compute_reduced_uint8_t_all_cost_no_fill_better_pad_smart_full_s
 				shared_memory_flag = 0;
 			}
 
+			// fill the projected padding
 			if (shared_memory_flag == 1) {
 				sub_y_cam = &float_sub_y_ref[padding_length * padding_length];
 				int p = threadIdx.x + threadIdx.y * shared_width;
@@ -2463,6 +2499,7 @@ __global__ void compute_reduced_uint8_t_all_cost_no_fill_better_pad_less_global_
 	float best_cost = 255.0;
 	float best_depth = 0.0; 
 
+	// Fill shared memory
 	if (threadIdx.x == 0) {
 		if (threadIdx.y == 0) width = *const_width;
 		if (threadIdx.y == 1) height = *const_height;
@@ -2496,6 +2533,7 @@ __global__ void compute_reduced_uint8_t_all_cost_no_fill_better_pad_less_global_
 		int shared_ref_width;
 		int shared_ref_height;
 
+		// Compute ref padding parameters
 		if ((blockIdx.x + 1) * N_THREADS > width)
 			shared_ref_width = width - blockIdx.x * N_THREADS;
 		else
@@ -2505,6 +2543,7 @@ __global__ void compute_reduced_uint8_t_all_cost_no_fill_better_pad_less_global_
 		else
 			shared_ref_height = N_THREADS;
 
+		// Fill ref padding
 		int p = threadIdx.x + threadIdx.y * shared_ref_width;
 
 		while (p < padding_length * padding_length) {
@@ -2548,6 +2587,7 @@ __global__ void compute_reduced_uint8_t_all_cost_no_fill_better_pad_less_global_
 			int x_proj2 = x_proj < 0 || x_proj >= width ? 0 : (int)roundf(x_proj);
 			int y_proj2 = y_proj < 0 || y_proj >= height ? 0 : (int)roundf(y_proj);
 
+			// Find projected padding corners
 			if (threadIdx.x == 0) {
 				if (threadIdx.y == 0) {
 					cam_x_proj[0] = x_proj2;
@@ -2572,6 +2612,8 @@ __global__ void compute_reduced_uint8_t_all_cost_no_fill_better_pad_less_global_
 			}
 
 			__syncthreads();
+
+			// Compute projected padding parameters
 			int min_cam_x = umin(cam_x_proj[0], cam_x_proj[2]) - half_window;
 			int min_cam_y = umin(cam_y_proj[0], cam_y_proj[1]) - half_window;
 			int sub_y_cam_width = umax(cam_x_proj[1], cam_x_proj[3]) + half_window - min_cam_x + 1;
@@ -2582,6 +2624,7 @@ __global__ void compute_reduced_uint8_t_all_cost_no_fill_better_pad_less_global_
 				shared_memory_flag = 0;
 			}
 
+			// fill the projected padding
 			if (shared_memory_flag == 1) {
 				sub_y_cam = &float_sub_y_ref[padding_length * padding_length];
 				int p = threadIdx.x + threadIdx.y * shared_width;
@@ -2657,21 +2700,248 @@ __global__ void compute_reduced_uint8_t_all_cost_no_fill_better_pad_less_global_
 	depth[MI(x, y, width)] = (uint8_t) best_depth;
 }
 
+//__global__ void compute_reduced_uint8_t_all_cost_no_fill_better_pad_less_global_smart_full_shared_full_float_2D(float* cost_cube, uint8_t* depth, const float* y_ref, const float* y_cam)
+//{
+//	int x = blockIdx.x * blockDim.x + threadIdx.x;
+//	int y = blockIdx.y * blockDim.y + threadIdx.y;
+//
+//	__shared__ int width;
+//	__shared__ int height;
+//	__shared__ float znear;
+//	__shared__ float zfar;
+//	__shared__ float ZPlanes;
+//	__shared__ int half_window;
+//	__shared__ float K[9];
+//	__shared__ float R[9];
+//	__shared__ float t[3];
+//	__shared__ float inv_K[9];
+//	__shared__ float inv_R[9];
+//	__shared__ float inv_t[3];
+//	__shared__ int cam_x_proj[4];
+//	__shared__ int cam_y_proj[4];
+//	__shared__ float* sub_y_cam;
+//	__shared__ int shared_width;
+//	__shared__ int shared_height;
+//
+//	extern __shared__ float float_sub_y_ref[];
+//
+//	if (x >= *const_width || y >= *const_height)
+//		return;
+//
+//	float best_cost = 255.0;
+//	float best_depth = 0.0;
+//
+//	// Fill shared memory
+//	if (threadIdx.x == 0) {
+//		if (threadIdx.y == 0) width = *const_width;
+//		else if (threadIdx.y == 1) height = *const_height;
+//		else if (threadIdx.y == 2) znear = *const_znear;
+//		else if (threadIdx.y == 3) zfar = *const_zfar;
+//		else if (threadIdx.y == 4) ZPlanes = *const_ZPlanes;
+//		else if (threadIdx.y == 5) half_window = *const_half_window;
+//	}
+//	else if (threadIdx.x == 1 && threadIdx.y < 9) K[threadIdx.y] = const_K[threadIdx.y];
+//	else if (threadIdx.x == 2 && threadIdx.y < 9) R[threadIdx.y] = const_R[threadIdx.y];
+//	else if (threadIdx.x == 3 && threadIdx.y < 3) t[threadIdx.y] = const_t[threadIdx.y];
+//	else if (threadIdx.x == 4 && threadIdx.y < 9) inv_K[threadIdx.y] = const_inv_K[threadIdx.y];
+//	else if (threadIdx.x == 5 && threadIdx.y < 9) inv_R[threadIdx.y] = const_inv_R[threadIdx.y];
+//	else if (threadIdx.x == 6 && threadIdx.y < 3) inv_t[threadIdx.y] = const_inv_t[threadIdx.y];
+//
+//	int padding_length = N_THREADS + 2 * half_window;
+//	int padding_x = half_window + threadIdx.x;
+//	int padding_y = half_window + threadIdx.y;
+//
+//	int shared_ref_width;
+//	int shared_ref_height;
+//
+//	// Compute ref padding parameters
+//	if ((blockIdx.x + 1) * N_THREADS > *const_width)
+//		shared_ref_width = *const_width - blockIdx.x * N_THREADS;
+//	else
+//		shared_ref_width = N_THREADS;
+//	if ((blockIdx.y + 1) * N_THREADS > *const_height)
+//		shared_ref_height = *const_heightt - blockIdx.y * N_THREADS;
+//	else
+//		shared_ref_height = N_THREADS;
+//
+//	// Fill ref padding
+//	int p = threadIdx.x + threadIdx.y * shared_ref_width;
+//
+//	while (p < padding_length * padding_length) {
+//		int cam_x = MI(p % padding_length - half_window, blockIdx.x, N_THREADS);
+//		int cam_y = MI(p / padding_length - half_window, blockIdx.y, N_THREADS);
+//		if (cam_x < 0 || cam_y < 0 || cam_x >= width || cam_y >= height) {
+//			p += shared_ref_width * shared_ref_height;
+//			continue;
+//		}
+//		float_sub_y_ref[p] = y_ref[MI(cam_x, cam_y, width)];
+//		p += shared_ref_width * shared_ref_height;
+//	}
+//
+//	__syncthreads();
+//
+//	for (int cam_n = 0; cam_n < *const_cam_count; cam_n++) {
+//
+//		if (cam_n != 0) {
+//			if (threadIdx.x == 1 && threadIdx.y < 9) K[threadIdx.y] = const_K[MI(threadIdx.y, cam_n, 9)];
+//			else if (threadIdx.x == 2 && threadIdx.y < 9) R[threadIdx.y] = const_R[MI(threadIdx.y, cam_n, 9)];
+//			else if (threadIdx.x == 3 && threadIdx.y < 3) t[threadIdx.y] = const_t[MI(threadIdx.y, cam_n, 3)];
+//		}
+//
+//		__syncthreads();
+//
+//		for (int zi = 0; zi < 256; zi++) {
+//
+//			// Calculate z from ZNear, ZFar and ZPlanes (projective transformation) (zi = 0, z = ZFar)
+//			float z = znear * zfar / (znear + ((zi / ZPlanes) * (zfar - znear))); //need to be in the x and y loops?
+//
+//			// 2D ref camera point to 3D in ref camera coordinates (p * K_inv)
+//			float X_ref = (inv_K[0] * x + inv_K[1] * y + inv_K[2]) * z;
+//			float Y_ref = (inv_K[3] * x + inv_K[4] * y + inv_K[5]) * z;
+//			float Z_ref = (inv_K[6] * x + inv_K[7] * y + inv_K[8]) * z;
+//
+//			// 3D in ref camera coordinates to 3D world
+//			float X = inv_R[0] * X_ref + inv_R[1] * Y_ref + inv_R[2] * Z_ref - inv_t[0];
+//			float Y = inv_R[3] * X_ref + inv_R[4] * Y_ref + inv_R[5] * Z_ref - inv_t[1];
+//			float Z = inv_R[6] * X_ref + inv_R[7] * Y_ref + inv_R[8] * Z_ref - inv_t[2];
+//
+//			// 3D world to projected camera 3D coordinates
+//			float X_proj = const_R[MI(0, cam_n, 9)] * X + const_R[MI(1, cam_n, 9)] * Y + const_R[MI(2, cam_n, 9)] * Z - const_t[MI(0, cam_n, 3)];
+//			float Y_proj = const_R[MI(3, cam_n, 9)] * X + const_R[MI(4, cam_n, 9)] * Y + const_R[MI(5, cam_n, 9)] * Z - const_t[MI(1, cam_n, 3)];
+//			float Z_proj = const_R[MI(6, cam_n, 9)] * X + const_R[MI(7, cam_n, 9)] * Y + const_R[MI(8, cam_n, 9)] * Z - const_t[MI(2, cam_n, 3)];
+//
+//			// Projected camera 3D coordinates to projected camera 2D coordinates
+//			float x_proj = (const_K[MI(0, cam_n, 9)] * X_proj / Z_proj + const_K[MI(1, cam_n, 9)] * Y_proj / Z_proj + const_K[MI(2, cam_n, 9)]);
+//			float y_proj = (const_K[MI(3, cam_n, 9)] * X_proj / Z_proj + const_K[MI(4, cam_n, 9)] * Y_proj / Z_proj + const_K[MI(5, cam_n, 9)]);
+//
+//			int x_proj2 = x_proj < 0 || x_proj >= width ? 0 : (int)roundf(x_proj);
+//			int y_proj2 = y_proj < 0 || y_proj >= height ? 0 : (int)roundf(y_proj);
+//
+//			// Find projected padding corners
+//			if (threadIdx.x == 0) {
+//				if (threadIdx.y == 0) {
+//					cam_x_proj[0] = x_proj2;
+//					cam_y_proj[0] = y_proj2;
+//				}
+//				else if (threadIdx.y == N_THREADS - 1 || y == height - 1) {
+//					cam_x_proj[1] = x_proj2;
+//					cam_y_proj[1] = y_proj2;
+//				}
+//			}
+//			else if (threadIdx.x == N_THREADS - 1 || x == width - 1) {
+//				if (threadIdx.y == 0) {
+//					cam_x_proj[2] = x_proj2;
+//					cam_y_proj[2] = y_proj2;
+//				}
+//				else if (threadIdx.y == N_THREADS - 1 || y == height - 1) {
+//					cam_x_proj[3] = x_proj2;
+//					cam_y_proj[3] = y_proj2;
+//					shared_width = threadIdx.x;
+//					shared_height = threadIdx.y;
+//				}
+//			}
+//
+//			__syncthreads();
+//
+//			// Compute projected padding parameters
+//			int min_cam_x = umin(cam_x_proj[0], cam_x_proj[2]) - half_window;
+//			int min_cam_y = umin(cam_y_proj[0], cam_y_proj[1]) - half_window;
+//			int sub_y_cam_width = umax(cam_x_proj[1], cam_x_proj[3]) + half_window - min_cam_x + 1;
+//			int sub_y_cam_height = umax(cam_y_proj[2], cam_y_proj[3]) + half_window - min_cam_y + 1;
+//			int shared_memory_flag = 1;
+//
+//			if (sub_y_cam_width * sub_y_cam_height > 2 * padding_length * padding_length) {
+//				shared_memory_flag = 0;
+//			}
+//
+//			// fill the projected padding
+//			if (shared_memory_flag == 1) {
+//				sub_y_cam = &float_sub_y_ref[padding_length * padding_length];
+//				int p = threadIdx.x + threadIdx.y * shared_width;
+//
+//				while (p < sub_y_cam_width * sub_y_cam_height) {
+//					int cam_x = min_cam_x + p % sub_y_cam_width;
+//					int cam_y = min_cam_y + p / sub_y_cam_width;
+//					if (cam_x < 0 || cam_y < 0 || cam_x >= width || cam_y >= height) {
+//						p += shared_width * shared_height;
+//						continue;
+//					}
+//					sub_y_cam[p] = y_cam[MI3(cam_x, cam_y, cam_n, width, height)];
+//					p += shared_width * shared_height;
+//				}
+//			}
+//
+//			__syncthreads();
+//
+//			// (ii) calculate cost against reference
+//			// Calculating cost in a window
+//			float cost = 0.0f;
+//			float cc = 0.0f;
+//			for (int k = -(half_window); k <= half_window; k++)
+//			{
+//				for (int l = -(half_window); l <= half_window; l++)
+//				{
+//					if (x + l < 0 || x + l >= width)
+//						continue;
+//					if (y + k < 0 || y + k >= height)
+//						continue;
+//					if (x_proj2 + l < 0 || x_proj2 + l >= width)
+//						continue;
+//					if (y_proj2 + k < 0 || y_proj2 + k >= height)
+//						continue;
+//
+//
+//					if (shared_memory_flag == 1) {
+//						if (x_proj2 - min_cam_x + l >= 0 && x_proj2 - min_cam_x + l < sub_y_cam_width && y_proj2 - min_cam_y + k >= 0 && y_proj2 - min_cam_y + k < sub_y_cam_height) {
+//							cost += fabsf(float_sub_y_ref[MI(padding_x + l, padding_y + k, padding_length)] - sub_y_cam[MI(x_proj2 - min_cam_x + l, y_proj2 - min_cam_y + k, sub_y_cam_width)]);
+//						}
+//					}
+//					else {
+//						cost += fabsf(float_sub_y_ref[MI(padding_x + l, padding_y + k, padding_length)] - y_cam[MI3(x_proj2 + l, y_proj2 + k, cam_n, width, height)]);
+//					}
+//					cc += 1.0f;
+//				}
+//			}
+//			cost /= cc;
+//
+//			//  (iii) store minimum cost (arranged as cost images, e.g., first image = cost of every pixel for the first candidate)
+//			// only the minimum cost for all the cameras is stored
+//			if (cam_n == 0 && zi == 0) {
+//				if (cost < 255.0) {
+//					best_depth = zi;
+//					best_cost = cost;
+//				}
+//				else {
+//					best_depth = 255;
+//					best_cost = 255.0;
+//				}
+//			}
+//			else if (best_cost > cost) {
+//				best_depth = zi;
+//				best_cost = cost;
+//			}
+//			else if (best_cost == cost && best_depth > zi) {
+//				best_depth = zi;
+//			}
+//
+//			__syncthreads();
+//		}
+//	}
+//	depth[MI(x, y, width)] = (uint8_t)best_depth;
+//}
 
 
 
 float* frame2frame_matching_naive_baseline(cam &ref, cam &cam_1, cv::Mat &cost_cube_plane, int zi, int half_window)
 {
-
 	uint mat_length;
 	cv::Mat mat;
-
-	
 
 	// Only one plane
 	mat_length = cost_cube_plane.total() * cost_cube_plane.channels();
 	uint im_length = mat_length * 3 / 2;
 
+	// Pass matrices into array
 	float* new_cost_cube = new float[mat_length];
 	float* mat_arr_plane = cost_cube_plane.isContinuous() ? (float*)cost_cube_plane.data : (float*)cost_cube_plane.clone().data;
 	memcpy((void*)new_cost_cube, (void*)mat_arr_plane, mat_length * sizeof(float));
@@ -2686,6 +2956,7 @@ float* frame2frame_matching_naive_baseline(cam &ref, cam &cam_1, cv::Mat &cost_c
 	mat_arr = mat.isContinuous() ? (uint8_t*)mat.data : (uint8_t*)mat.clone().data;
 	memcpy((void*)y_cam, (void*)mat_arr, im_length * sizeof(uint8_t));
 
+	// define pointers
 	double* K = &cam_1.p.K[0]; double* R = &cam_1.p.R[0]; double* t = &cam_1.p.t[0];
 	double* inv_K = &ref.p.K_inv[0]; double* inv_R = &ref.p.R_inv[0]; double* inv_t = &ref.p.t_inv[0];
 
@@ -2696,6 +2967,7 @@ float* frame2frame_matching_naive_baseline(cam &ref, cam &cam_1, cv::Mat &cost_c
 
 	CHK(cudaSetDevice(0));
 
+	// Alloc memory on GPU
 	CHK(cudaMalloc((void**)&dev_width, sizeof(int)));
 	CHK(cudaMalloc((void**)&dev_height, sizeof(int)));
 	CHK(cudaMalloc((void**)&dev_zi, sizeof(int)));
@@ -2713,6 +2985,7 @@ float* frame2frame_matching_naive_baseline(cam &ref, cam &cam_1, cv::Mat &cost_c
 	CHK(cudaMalloc((void**)&dev_Y_cam, im_length * sizeof(uint8_t)));
 	CHK(cudaMalloc((void**)&dev_cost_cube, mat_length * sizeof(float)));
 
+	// Transfer data to GPU
 	CHK(cudaMemcpy(dev_width, &ref.width, sizeof(int), cudaMemcpyHostToDevice));
 	CHK(cudaMemcpy(dev_height, &ref.height, sizeof(int), cudaMemcpyHostToDevice));
 	CHK(cudaMemcpy(dev_zi, &zi, sizeof(int), cudaMemcpyHostToDevice));
@@ -2770,15 +3043,14 @@ float* frame2frame_matching_naive_baseline(cam &ref, cam &cam_1, cv::Mat &cost_c
 
 float* frame2frame_matching_naive_float(cam& ref, cam& cam_1, cv::Mat& cost_cube_plane, int zi, int half_window)
 {
-
 	uint mat_length;
 	cv::Mat mat;
-
 
 	// Only one plane
 	mat_length = cost_cube_plane.total() * cost_cube_plane.channels();
 	uint im_length = mat_length * 3 / 2;
 
+	// Pass matrices into array
 	float* new_cost_cube = new float[mat_length];
 	float* mat_arr_plane = cost_cube_plane.isContinuous() ? (float*)cost_cube_plane.data : (float*)cost_cube_plane.clone().data;
 	memcpy((void*)new_cost_cube, (void*)mat_arr_plane, mat_length * sizeof(float));
@@ -2793,6 +3065,7 @@ float* frame2frame_matching_naive_float(cam& ref, cam& cam_1, cv::Mat& cost_cube
 	mat_arr = mat.isContinuous() ? (uint8_t*)mat.data : (uint8_t*)mat.clone().data;
 	memcpy((void*)y_cam, (void*)mat_arr, im_length * sizeof(uint8_t));
 
+	// define pointers
 	float K[9];
 	float R[9];
 	float inv_K[9];
@@ -2819,6 +3092,7 @@ float* frame2frame_matching_naive_float(cam& ref, cam& cam_1, cv::Mat& cost_cube
 
 	CHK(cudaSetDevice(0));
 
+	// Alloc memory on GPU
 	CHK(cudaMalloc((void**)&dev_width, sizeof(int)));
 	CHK(cudaMalloc((void**)&dev_height, sizeof(int)));
 	CHK(cudaMalloc((void**)&dev_zi, sizeof(float)));
@@ -2836,6 +3110,7 @@ float* frame2frame_matching_naive_float(cam& ref, cam& cam_1, cv::Mat& cost_cube
 	CHK(cudaMalloc((void**)&dev_Y_cam, im_length * sizeof(uint8_t)));
 	CHK(cudaMalloc((void**)&dev_cost_cube, mat_length * sizeof(float)));
 
+	// Transfer data to GPU
 	CHK(cudaMemcpy(dev_width, &ref.width, sizeof(int), cudaMemcpyHostToDevice));
 	CHK(cudaMemcpy(dev_height, &ref.height, sizeof(int), cudaMemcpyHostToDevice));
 	CHK(cudaMemcpy(dev_zi, &new_zi, sizeof(float), cudaMemcpyHostToDevice));
@@ -2893,15 +3168,14 @@ float* frame2frame_matching_naive_float(cam& ref, cam& cam_1, cv::Mat& cost_cube
 
 float* frame2frame_matching_naive_float_2D(cam& ref, cam& cam_1, cv::Mat& cost_cube_plane, int zi, int half_window)
 {
-
 	uint mat_length;
 	cv::Mat mat;
-
 
 	// Only one plane
 	mat_length = cost_cube_plane.total() * cost_cube_plane.channels();
 	uint im_length = mat_length * 3 / 2;
 
+	// Pass matrices into array
 	float* new_cost_cube = new float[mat_length];
 	float* mat_arr_plane = cost_cube_plane.isContinuous() ? (float*)cost_cube_plane.data : (float*)cost_cube_plane.clone().data;
 	memcpy((void*)new_cost_cube, (void*)mat_arr_plane, mat_length * sizeof(float));
@@ -2916,6 +3190,7 @@ float* frame2frame_matching_naive_float_2D(cam& ref, cam& cam_1, cv::Mat& cost_c
 	mat_arr = mat.isContinuous() ? (uint8_t*)mat.data : (uint8_t*)mat.clone().data;
 	memcpy((void*)y_cam, (void*)mat_arr, im_length * sizeof(uint8_t));
 
+	// define pointers
 	float K[9];
 	float R[9];
 	float inv_K[9];
@@ -2942,6 +3217,7 @@ float* frame2frame_matching_naive_float_2D(cam& ref, cam& cam_1, cv::Mat& cost_c
 
 	CHK(cudaSetDevice(0));
 
+	// Alloc memory on GPU
 	CHK(cudaMalloc((void**)&dev_width, sizeof(int)));
 	CHK(cudaMalloc((void**)&dev_height, sizeof(int)));
 	CHK(cudaMalloc((void**)&dev_zi, sizeof(float)));
@@ -2959,6 +3235,7 @@ float* frame2frame_matching_naive_float_2D(cam& ref, cam& cam_1, cv::Mat& cost_c
 	CHK(cudaMalloc((void**)&dev_Y_cam, im_length * sizeof(uint8_t)));
 	CHK(cudaMalloc((void**)&dev_cost_cube, mat_length * sizeof(float)));
 
+	// Transfer data to GPU
 	CHK(cudaMemcpy(dev_width, &ref.width, sizeof(int), cudaMemcpyHostToDevice));
 	CHK(cudaMemcpy(dev_height, &ref.height, sizeof(int), cudaMemcpyHostToDevice));
 	CHK(cudaMemcpy(dev_zi, &new_zi, sizeof(float), cudaMemcpyHostToDevice));
@@ -3018,7 +3295,6 @@ float* frame2frame_matching_naive_float_2D(cam& ref, cam& cam_1, cv::Mat& cost_c
 
 float* frame2frame_matching_partially_shared_float_2D(cam& ref, cam& cam_1, cv::Mat& cost_cube_plane, int zi, int half_window)
 {
-
 	uint mat_length;
 	cv::Mat mat;
 
@@ -3026,6 +3302,7 @@ float* frame2frame_matching_partially_shared_float_2D(cam& ref, cam& cam_1, cv::
 	mat_length = cost_cube_plane.total() * cost_cube_plane.channels();
 	uint im_length = mat_length * 3 / 2;
 
+	// Pass matrices into array
 	float* new_cost_cube = new float[mat_length];
 	float* mat_arr_plane = cost_cube_plane.isContinuous() ? (float*)cost_cube_plane.data : (float*)cost_cube_plane.clone().data;
 	memcpy((void*)new_cost_cube, (void*)mat_arr_plane, mat_length * sizeof(float));
@@ -3040,6 +3317,7 @@ float* frame2frame_matching_partially_shared_float_2D(cam& ref, cam& cam_1, cv::
 	mat_arr = mat.isContinuous() ? (uint8_t*)mat.data : (uint8_t*)mat.clone().data;
 	memcpy((void*)y_cam, (void*)mat_arr, im_length * sizeof(uint8_t));
 
+	// define pointers
 	float K[9];
 	float R[9];
 	float inv_K[9];
@@ -3066,6 +3344,7 @@ float* frame2frame_matching_partially_shared_float_2D(cam& ref, cam& cam_1, cv::
 
 	CHK(cudaSetDevice(0));
 
+	// Alloc memory on GPU
 	CHK(cudaMalloc((void**)&dev_width, sizeof(int)));
 	CHK(cudaMalloc((void**)&dev_height, sizeof(int)));
 	CHK(cudaMalloc((void**)&dev_zi, sizeof(float)));
@@ -3083,6 +3362,7 @@ float* frame2frame_matching_partially_shared_float_2D(cam& ref, cam& cam_1, cv::
 	CHK(cudaMalloc((void**)&dev_Y_cam, im_length * sizeof(uint8_t)));
 	CHK(cudaMalloc((void**)&dev_cost_cube, mat_length * sizeof(float)));
 
+	// Transfer data to GPU
 	CHK(cudaMemcpy(dev_width, &ref.width, sizeof(int), cudaMemcpyHostToDevice));
 	CHK(cudaMemcpy(dev_height, &ref.height, sizeof(int), cudaMemcpyHostToDevice));
 	CHK(cudaMemcpy(dev_zi, &new_zi, sizeof(float), cudaMemcpyHostToDevice));
@@ -3142,7 +3422,6 @@ float* frame2frame_matching_partially_shared_float_2D(cam& ref, cam& cam_1, cv::
 
 float* frame2frame_matching_shared_float_2D(cam& ref, cam& cam_1, cv::Mat& cost_cube_plane, int zi, int half_window)
 {
-
 	uint mat_length;
 	cv::Mat mat;
 
@@ -3150,6 +3429,7 @@ float* frame2frame_matching_shared_float_2D(cam& ref, cam& cam_1, cv::Mat& cost_
 	mat_length = cost_cube_plane.total() * cost_cube_plane.channels();
 	uint im_length = mat_length * 3 / 2;
 
+	// Pass matrices into array
 	float* new_cost_cube = new float[mat_length];
 	float* mat_arr_plane = cost_cube_plane.isContinuous() ? (float*)cost_cube_plane.data : (float*)cost_cube_plane.clone().data;
 	memcpy((void*)new_cost_cube, (void*)mat_arr_plane, mat_length * sizeof(float));
@@ -3164,6 +3444,7 @@ float* frame2frame_matching_shared_float_2D(cam& ref, cam& cam_1, cv::Mat& cost_
 	mat_arr = mat.isContinuous() ? (uint8_t*)mat.data : (uint8_t*)mat.clone().data;
 	memcpy((void*)y_cam, (void*)mat_arr, im_length * sizeof(uint8_t));
 
+	// define pointers
 	float K[9];
 	float R[9];
 	float inv_K[9];
@@ -3190,6 +3471,7 @@ float* frame2frame_matching_shared_float_2D(cam& ref, cam& cam_1, cv::Mat& cost_
 
 	CHK(cudaSetDevice(0));
 
+	// Alloc memory on GPU
 	CHK(cudaMalloc((void**)&dev_width, sizeof(int)));
 	CHK(cudaMalloc((void**)&dev_height, sizeof(int)));
 	CHK(cudaMalloc((void**)&dev_zi, sizeof(float)));
@@ -3207,6 +3489,7 @@ float* frame2frame_matching_shared_float_2D(cam& ref, cam& cam_1, cv::Mat& cost_
 	CHK(cudaMalloc((void**)&dev_Y_cam, im_length * sizeof(uint8_t)));
 	CHK(cudaMalloc((void**)&dev_cost_cube, mat_length * sizeof(float)));
 
+	// Transfer data to GPU
 	CHK(cudaMemcpy(dev_width, &ref.width, sizeof(int), cudaMemcpyHostToDevice));
 	CHK(cudaMemcpy(dev_height, &ref.height, sizeof(int), cudaMemcpyHostToDevice));
 	CHK(cudaMemcpy(dev_zi, &new_zi, sizeof(float), cudaMemcpyHostToDevice));
@@ -3266,7 +3549,6 @@ float* frame2frame_matching_shared_float_2D(cam& ref, cam& cam_1, cv::Mat& cost_
 
 float* frame2frame_matching_shared_full_float_2D(cam& ref, cam& cam_1, cv::Mat& cost_cube_plane, int zi, int half_window)
 {
-
 	uint mat_length;
 	cv::Mat mat;
 
@@ -3274,6 +3556,7 @@ float* frame2frame_matching_shared_full_float_2D(cam& ref, cam& cam_1, cv::Mat& 
 	mat_length = cost_cube_plane.total() * cost_cube_plane.channels();
 	uint im_length = mat_length * 3 / 2;
 
+	// Pass matrices into array
 	float* new_cost_cube = new float[mat_length];
 	float* mat_arr_plane = cost_cube_plane.isContinuous() ? (float*)cost_cube_plane.data : (float*)cost_cube_plane.clone().data;
 	memcpy((void*)new_cost_cube, (void*)mat_arr_plane, mat_length * sizeof(float));
@@ -3288,6 +3571,7 @@ float* frame2frame_matching_shared_full_float_2D(cam& ref, cam& cam_1, cv::Mat& 
 	mat_arr = mat.isContinuous() ? (float*)mat.data : (float*)mat.clone().data;
 	memcpy((void*)y_cam, (void*)mat_arr, im_length * sizeof(float));
 
+	// define pointers
 	float K[9];
 	float R[9];
 	float inv_K[9];
@@ -3311,10 +3595,12 @@ float* frame2frame_matching_shared_full_float_2D(cam& ref, cam& cam_1, cv::Mat& 
 
 	CHK(cudaSetDevice(0));
 
+	// Alloc memory on GPU
 	CHK(cudaMalloc((void**)&dev_Y_ref, im_length * sizeof(float)));
 	CHK(cudaMalloc((void**)&dev_Y_cam, im_length * sizeof(float)));
 	CHK(cudaMalloc((void**)&dev_cost_cube, mat_length * sizeof(float)));
 
+	// Transfer data to GPU
 	CHK(cudaMemcpyToSymbol(const_width, &ref.width, sizeof(int), 0, cudaMemcpyHostToDevice));
 	CHK(cudaMemcpyToSymbol(const_height, &ref.height, sizeof(int), 0, cudaMemcpyHostToDevice));
 	CHK(cudaMemcpyToSymbol(const_zi, &new_zi, sizeof(float), 0, cudaMemcpyHostToDevice));
@@ -3361,7 +3647,6 @@ float* frame2frame_matching_shared_full_float_2D(cam& ref, cam& cam_1, cv::Mat& 
 
 float* frame2frame_matching_smart_naive_full_float_2D(cam& ref, cam& cam_1, std::vector<cv::Mat>& cost_cube, int half_window)
 {
-
 	uint mat_length;
 	cv::Mat mat;
 
@@ -3369,6 +3654,7 @@ float* frame2frame_matching_smart_naive_full_float_2D(cam& ref, cam& cam_1, std:
 	mat_length = ref.height * ref.width;
 	uint im_length = mat_length * 3 / 2;
 
+	// Pass matrices into array
 	float* new_cost_cube = new float[mat_length * ZPlanes];
 	for (int i = 0; i < ZPlanes; i++)
 	{
@@ -3387,6 +3673,7 @@ float* frame2frame_matching_smart_naive_full_float_2D(cam& ref, cam& cam_1, std:
 	mat_arr = mat.isContinuous() ? (float*)mat.data : (float*)mat.clone().data;
 	memcpy((void*)y_cam, (void*)mat_arr, im_length * sizeof(float));
 
+	// define pointers
 	float K[9];
 	float R[9];
 	float inv_K[9];
@@ -3410,10 +3697,12 @@ float* frame2frame_matching_smart_naive_full_float_2D(cam& ref, cam& cam_1, std:
 
 	CHK(cudaSetDevice(0));
 
+	// Alloc memory on GPU
 	CHK(cudaMalloc((void**)&dev_Y_ref, im_length * sizeof(float)));
 	CHK(cudaMalloc((void**)&dev_Y_cam, im_length * sizeof(float)));
 	CHK(cudaMalloc((void**)&dev_cost_cube, mat_length * ZPlanes * sizeof(float)));
 
+	// Transfer data to GPU
 	CHK(cudaMemcpyToSymbol(const_width, &ref.width, sizeof(int), 0, cudaMemcpyHostToDevice));
 	CHK(cudaMemcpyToSymbol(const_height, &ref.height, sizeof(int), 0, cudaMemcpyHostToDevice));
 	CHK(cudaMemcpyToSymbol(const_znear, &ZNear, sizeof(float), 0, cudaMemcpyHostToDevice));
@@ -3459,8 +3748,7 @@ float* frame2frame_matching_smart_naive_full_float_2D(cam& ref, cam& cam_1, std:
 }
 
 float* frame2frame_matching_smart_shared_full_float_2D(cam& ref, cam& cam_1, std::vector<cv::Mat>& cost_cube, int half_window)
-{
-	
+{	
 	uint mat_length;
 	cv::Mat mat;
 	
@@ -3468,6 +3756,7 @@ float* frame2frame_matching_smart_shared_full_float_2D(cam& ref, cam& cam_1, std
 	mat_length = ref.height * ref.width;
 	uint im_length = mat_length * 3 / 2;
 
+	// Pass matrices into array
 	float* new_cost_cube = new float[mat_length * ZPlanes];
 	for (int i = 0; i < ZPlanes; i++)
 	{
@@ -3486,6 +3775,7 @@ float* frame2frame_matching_smart_shared_full_float_2D(cam& ref, cam& cam_1, std
 	mat_arr = mat.isContinuous() ? (float*)mat.data : (float*)mat.clone().data;
 	memcpy((void*)y_cam, (void*)mat_arr, im_length * sizeof(float));
 
+	// define pointers
 	float K[9];
 	float R[9];
 	float inv_K[9];
@@ -3509,11 +3799,12 @@ float* frame2frame_matching_smart_shared_full_float_2D(cam& ref, cam& cam_1, std
 
 	CHK(cudaSetDevice(0));
 
-	
+	// Alloc memory on GPU
 	CHK(cudaMalloc((void**)&dev_Y_ref, im_length * sizeof(float)));
 	CHK(cudaMalloc((void**)&dev_Y_cam, im_length * sizeof(float)));
 	CHK(cudaMalloc((void**)&dev_cost_cube, mat_length * ZPlanes * sizeof(float)));
 
+	// Transfer data to GPU
 	CHK(cudaMemcpyToSymbol(const_width, &ref.width, sizeof(int), 0, cudaMemcpyHostToDevice));
 	CHK(cudaMemcpyToSymbol(const_height, &ref.height, sizeof(int), 0, cudaMemcpyHostToDevice));
 	CHK(cudaMemcpyToSymbol(const_znear, &ZNear, sizeof(float), 0, cudaMemcpyHostToDevice));
@@ -3567,6 +3858,7 @@ float* frame2frame_matching_smart_full_shared_full_float_2D(cam& ref, cam& cam_1
 	mat_length = ref.height * ref.width;
 	uint im_length = mat_length * 3 / 2;
 
+	// Pass matrices into array
 	float* new_cost_cube = new float[mat_length * ZPlanes];
 	for (int i = 0; i < ZPlanes; i++)
 	{
@@ -3585,6 +3877,7 @@ float* frame2frame_matching_smart_full_shared_full_float_2D(cam& ref, cam& cam_1
 	mat_arr = mat.isContinuous() ? (float*)mat.data : (float*)mat.clone().data;
 	memcpy((void*)y_cam, (void*)mat_arr, im_length * sizeof(float));
 
+	// define pointers
 	float K[9];
 	float R[9];
 	float inv_K[9];
@@ -3608,11 +3901,12 @@ float* frame2frame_matching_smart_full_shared_full_float_2D(cam& ref, cam& cam_1
 
 	CHK(cudaSetDevice(0));
 
-
+	// Alloc memory on GPU
 	CHK(cudaMalloc((void**)&dev_Y_ref, im_length * sizeof(float)));
 	CHK(cudaMalloc((void**)&dev_Y_cam, im_length * sizeof(float)));
 	CHK(cudaMalloc((void**)&dev_cost_cube, mat_length * ZPlanes * sizeof(float)));
 
+	// Transfer data to GPU
 	CHK(cudaMemcpyToSymbol(const_width, &ref.width, sizeof(int), 0, cudaMemcpyHostToDevice));
 	CHK(cudaMemcpyToSymbol(const_height, &ref.height, sizeof(int), 0, cudaMemcpyHostToDevice));
 	CHK(cudaMemcpyToSymbol(const_znear, &ZNear, sizeof(float), 0, cudaMemcpyHostToDevice));
@@ -3667,6 +3961,7 @@ float* frame2frame_matching_all_smart_full_shared_full_float_2D(cam& ref, std::v
 	uint im_length = mat_length * 3 / 2;
 	const uint cam_count = cam_vector.size() - 1;
 
+	// Pass matrices into array
 	float* new_cost_cube = new float[mat_length * ZPlanes];
 	for (int i = 0; i < ZPlanes; i++)
 	{
@@ -3688,7 +3983,7 @@ float* frame2frame_matching_all_smart_full_shared_full_float_2D(cam& ref, std::v
 		memcpy((void*)&(y_cams[(i-1) * mat_length]), (void*)mat_arr, mat_length * sizeof(float));
 	}
 
-
+	// define pointers
 	float* K = new float[9 * cam_count];
 	float* R = new float[9 * cam_count];
 	float inv_K[9];
@@ -3715,11 +4010,12 @@ float* frame2frame_matching_all_smart_full_shared_full_float_2D(cam& ref, std::v
 
 	CHK(cudaSetDevice(0));
 
-
+	// Alloc memory on GPU
 	CHK(cudaMalloc((void**)&dev_Y_ref, im_length * sizeof(float)));
 	CHK(cudaMalloc((void**)&dev_Y_cams, im_length * cam_count * sizeof(float)));
 	CHK(cudaMalloc((void**)&dev_cost_cube, mat_length * ZPlanes * sizeof(float)));
 
+	// Transfer data to GPU
 	CHK(cudaMemcpyToSymbol(const_width, &ref.width, sizeof(int), 0, cudaMemcpyHostToDevice));
 	CHK(cudaMemcpyToSymbol(const_height, &ref.height, sizeof(int), 0, cudaMemcpyHostToDevice));
 	CHK(cudaMemcpyToSymbol(const_znear, &ZNear, sizeof(float), 0, cudaMemcpyHostToDevice));
@@ -3780,6 +4076,7 @@ float* frame2frame_matching_all_no_fill_smart_full_shared_full_float_2D(cam& ref
 
 	float* new_cost_cube = new float[mat_length * ZPlanes];
 
+	// Pass matrices into array
 	ref.YUV[0].convertTo(mat, CV_32F);
 	float* y_ref = new float[im_length];
 	float* mat_arr = mat.isContinuous() ? (float*)mat.data : (float*)mat.clone().data;
@@ -3794,6 +4091,7 @@ float* frame2frame_matching_all_no_fill_smart_full_shared_full_float_2D(cam& ref
 	}
 
 
+	// define pointers
 	float* K = new float[9 * cam_count];
 	float* R = new float[9 * cam_count];
 	float inv_K[9];
@@ -3820,11 +4118,12 @@ float* frame2frame_matching_all_no_fill_smart_full_shared_full_float_2D(cam& ref
 
 	CHK(cudaSetDevice(0));
 
-
+	// Alloc memory on GPU
 	CHK(cudaMalloc((void**)&dev_Y_ref, im_length * sizeof(float)));
 	CHK(cudaMalloc((void**)&dev_Y_cams, im_length * cam_count * sizeof(float)));
 	CHK(cudaMalloc((void**)&dev_cost_cube, mat_length * ZPlanes * sizeof(float)));
 
+	// Transfer data to GPU
 	CHK(cudaMemcpyToSymbol(const_width, &ref.width, sizeof(int), 0, cudaMemcpyHostToDevice));
 	CHK(cudaMemcpyToSymbol(const_height, &ref.height, sizeof(int), 0, cudaMemcpyHostToDevice));
 	CHK(cudaMemcpyToSymbol(const_znear, &ZNear, sizeof(float), 0, cudaMemcpyHostToDevice));
@@ -3883,6 +4182,7 @@ float* frame2frame_matching_all_no_fill_better_pad_smart_full_shared_full_float_
 
 	float* new_cost_cube = new float[mat_length * ZPlanes];
 
+	// Pass matrices into array
 	ref.YUV[0].convertTo(mat, CV_32F);
 	float* y_ref = new float[im_length];
 	float* mat_arr = mat.isContinuous() ? (float*)mat.data : (float*)mat.clone().data;
@@ -3896,7 +4196,7 @@ float* frame2frame_matching_all_no_fill_better_pad_smart_full_shared_full_float_
 		memcpy((void*)&(y_cams[(i - 1) * mat_length]), (void*)mat_arr, mat_length * sizeof(float));
 	}
 
-
+	// define pointers
 	float* K = new float[9 * cam_count];
 	float* R = new float[9 * cam_count];
 	float inv_K[9];
@@ -3923,11 +4223,12 @@ float* frame2frame_matching_all_no_fill_better_pad_smart_full_shared_full_float_
 
 	CHK(cudaSetDevice(0));
 
-
+	// Alloc memory on GPU
 	CHK(cudaMalloc((void**)&dev_Y_ref, im_length * sizeof(float)));
 	CHK(cudaMalloc((void**)&dev_Y_cams, im_length * cam_count * sizeof(float)));
 	CHK(cudaMalloc((void**)&dev_cost_cube, mat_length * ZPlanes * sizeof(float)));
 
+	// Transfer data to GPU
 	CHK(cudaMemcpyToSymbol(const_width, &ref.width, sizeof(int), 0, cudaMemcpyHostToDevice));
 	CHK(cudaMemcpyToSymbol(const_height, &ref.height, sizeof(int), 0, cudaMemcpyHostToDevice));
 	CHK(cudaMemcpyToSymbol(const_znear, &ZNear, sizeof(float), 0, cudaMemcpyHostToDevice));
@@ -3986,6 +4287,7 @@ float* frame2frame_matching_reduced_float_all_no_fill_better_pad_smart_full_shar
 
 	float* new_cost_cube = new float[mat_length * 2];
 
+	// Pass matrices into array
 	ref.YUV[0].convertTo(mat, CV_32F);
 	float* y_ref = new float[im_length];
 	float* mat_arr = mat.isContinuous() ? (float*)mat.data : (float*)mat.clone().data;
@@ -4000,6 +4302,7 @@ float* frame2frame_matching_reduced_float_all_no_fill_better_pad_smart_full_shar
 	}
 
 
+	// define pointers
 	float* K = new float[9 * cam_count];
 	float* R = new float[9 * cam_count];
 	float inv_K[9];
@@ -4026,11 +4329,12 @@ float* frame2frame_matching_reduced_float_all_no_fill_better_pad_smart_full_shar
 
 	CHK(cudaSetDevice(0));
 
-
+	// Alloc memory on GPU
 	CHK(cudaMalloc((void**)&dev_Y_ref, im_length * sizeof(float)));
 	CHK(cudaMalloc((void**)&dev_Y_cams, im_length * cam_count * sizeof(float)));
 	CHK(cudaMalloc((void**)&dev_cost_cube, mat_length * 2 * sizeof(float)));
 
+	// Transfer data to GPU
 	CHK(cudaMemcpyToSymbol(const_width, &ref.width, sizeof(int), 0, cudaMemcpyHostToDevice));
 	CHK(cudaMemcpyToSymbol(const_height, &ref.height, sizeof(int), 0, cudaMemcpyHostToDevice));
 	CHK(cudaMemcpyToSymbol(const_znear, &ZNear, sizeof(float), 0, cudaMemcpyHostToDevice));
@@ -4089,6 +4393,7 @@ uint8_t* frame2frame_matching_reduced_uint8_t_all_no_fill_better_pad_smart_full_
 
 	uint8_t* depth = new uint8_t[mat_length];
 
+	// Pass matrices into array
 	ref.YUV[0].convertTo(mat, CV_32F);
 	float* y_ref = new float[im_length];
 	float* mat_arr = mat.isContinuous() ? (float*)mat.data : (float*)mat.clone().data;
@@ -4102,7 +4407,7 @@ uint8_t* frame2frame_matching_reduced_uint8_t_all_no_fill_better_pad_smart_full_
 		memcpy((void*)&(y_cams[(i - 1) * mat_length]), (void*)mat_arr, mat_length * sizeof(float));
 	}
 
-
+	// define pointers
 	float* K = new float[9 * cam_count];
 	float* R = new float[9 * cam_count];
 	float inv_K[9];
@@ -4130,12 +4435,13 @@ uint8_t* frame2frame_matching_reduced_uint8_t_all_no_fill_better_pad_smart_full_
 
 	CHK(cudaSetDevice(0));
 
-
+	// Alloc memory on GPU
 	CHK(cudaMalloc((void**)&dev_Y_ref, im_length * sizeof(float)));
 	CHK(cudaMalloc((void**)&dev_Y_cams, im_length * cam_count * sizeof(float)));
 	CHK(cudaMalloc((void**)&dev_cost_cube, mat_length * sizeof(float)));
 	CHK(cudaMalloc((void**)&dev_depth, mat_length * sizeof(uint8_t)));
 
+	// Transfer data to GPU
 	CHK(cudaMemcpyToSymbol(const_width, &ref.width, sizeof(int), 0, cudaMemcpyHostToDevice));
 	CHK(cudaMemcpyToSymbol(const_height, &ref.height, sizeof(int), 0, cudaMemcpyHostToDevice));
 	CHK(cudaMemcpyToSymbol(const_znear, &ZNear, sizeof(float), 0, cudaMemcpyHostToDevice));
@@ -4194,6 +4500,7 @@ uint8_t* frame2frame_matching_reduced_uint8_t_all_no_fill_better_pad_less_global
 
 	uint8_t* depth = new uint8_t[mat_length];
 
+	// Pass matrices into array
 	ref.YUV[0].convertTo(mat, CV_32F);
 	float* y_ref = new float[im_length];
 	float* mat_arr = mat.isContinuous() ? (float*)mat.data : (float*)mat.clone().data;
@@ -4208,6 +4515,7 @@ uint8_t* frame2frame_matching_reduced_uint8_t_all_no_fill_better_pad_less_global
 	}
 
 
+	// define pointers
 	float* K = new float[9 * cam_count];
 	float* R = new float[9 * cam_count];
 	float inv_K[9];
@@ -4235,12 +4543,13 @@ uint8_t* frame2frame_matching_reduced_uint8_t_all_no_fill_better_pad_less_global
 
 	CHK(cudaSetDevice(0));
 
-
+	// Alloc memory on GPU
 	CHK(cudaMalloc((void**)&dev_Y_ref, im_length * sizeof(float)));
 	CHK(cudaMalloc((void**)&dev_Y_cams, im_length * cam_count * sizeof(float)));
 	CHK(cudaMalloc((void**)&dev_cost_cube, mat_length * sizeof(float)));
 	CHK(cudaMalloc((void**)&dev_depth, mat_length * sizeof(uint8_t)));
 
+	// Transfer data to GPU
 	CHK(cudaMemcpyToSymbol(const_width, &ref.width, sizeof(int), 0, cudaMemcpyHostToDevice));
 	CHK(cudaMemcpyToSymbol(const_height, &ref.height, sizeof(int), 0, cudaMemcpyHostToDevice));
 	CHK(cudaMemcpyToSymbol(const_znear, &ZNear, sizeof(float), 0, cudaMemcpyHostToDevice));
